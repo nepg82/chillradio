@@ -1,6 +1,6 @@
 // Service worker: cache the app shell so it works offline.
 // Bump CACHE whenever any file changes, or installed copies keep serving the old one.
-const CACHE = 'chill-radio-v0.1.0';
+const CACHE = 'chill-radio-v0.1.1';
 const ASSETS = [
   './', './index.html', './manifest.json', './css/style.css',
   './js/app.js', './js/mediasession.js',

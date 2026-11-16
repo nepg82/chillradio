@@ -76,7 +76,7 @@ export default {
         { name: 'Lush Saws',    p: { osc: [osc('sawtooth', 0.5, -10), osc('sawtooth', 0.5, 10)], filter: { freq: 1400, q: 0.5 }, amp: { a: 0.9, d: 0.5, s: 0.8, r: 1.4 }, gain: 0.1 } },
         { name: 'Glass',        p: { osc: [osc('triangle', 0.6, -6), osc('triangle', 0.6, 6), osc('sine', 0.4, 0, 2)], filter: { freq: 3500 }, amp: { a: 0.6, d: 0.5, s: 0.8, r: 1.2 }, gain: 0.13 } },
         { name: 'Warm Strings', p: { osc: [osc('sawtooth', 0.4, -8), osc('sawtooth', 0.4, 8)], filter: { freq: 900, env: 600, decay: 1.5 }, amp: { a: 1.0, d: 0.6, s: 0.8, r: 1.5 }, gain: 0.11 } },
-        { name: 'Dream Choir',  p: { osc: [osc('sine'), osc('triangle', 0.4, 7, 2), osc('sine', 0.15, 0, 3)], filter: { freq: 3000 }, vibrato: { rate: 5, depth: 8 }, amp: { a: 0.8, d: 0.5, s: 0.85, r: 1.3 }, gain: 0.15 } },
+        { name: 'Dream Choir',  p: { osc: [osc('sine'), osc('triangle', 0.4, 7, 2), osc('sine', 0.15, 0, 3)], filter: { freq: 3000 }, vibrato: { rate: 5, depth: 8 }, amp: { a: 0.8, d: 0.5, s: 0.85, r: 1.3 }, gain: 0.05 } },
       ],
     },
     {
@@ -89,8 +89,8 @@ export default {
       ],
       voices: [
         { name: 'Dreamy Square', p: { osc: [osc('square', 0.5), osc('square', 0.5, 8)], filter: { freq: 2200 }, vibrato: { rate: 5.5, depth: 10 }, amp: { a: 0.03, d: 0.3, s: 0.6, r: 0.5 }, gain: 0.12 } },
-        { name: 'Soft Saw',      p: { osc: [osc('sawtooth')], filter: { freq: 1800, env: 1500, decay: 0.3 }, amp: { a: 0.02, d: 0.3, s: 0.6, r: 0.4 }, gain: 0.13 } },
-        { name: 'Bell Pluck',    p: { osc: [osc('sine'), osc('sine', 0.3, 0, 3.5)], filter: { freq: 5000 }, amp: { a: 0.005, d: 0.8, s: 0, r: 0.6 }, gain: 0.25 } },
+        { name: 'Soft Saw',      p: { osc: [osc('sawtooth')], filter: { freq: 1800, env: 1500, decay: 0.3 }, amp: { a: 0.02, d: 0.3, s: 0.6, r: 0.4 }, gain: 0.85 } },
+        { name: 'Bell Pluck',    p: { osc: [osc('sine'), osc('sine', 0.3, 0, 3.5)], filter: { freq: 5000 }, amp: { a: 0.005, d: 0.8, s: 0, r: 0.6 }, gain: 0.15 } },
         { name: 'Tape Sine',     p: { osc: [osc('sine'), osc('triangle', 0.2, 0, 2)], filter: { freq: 3000 }, vibrato: { rate: 4.5, depth: 15 }, amp: { a: 0.05, d: 0.3, s: 0.7, r: 0.5 }, gain: 0.2 } },
       ],
     },
