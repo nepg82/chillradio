@@ -59,6 +59,17 @@ const fmtDur = ms => `${Math.floor(ms / 3600000)}h ${Math.floor(ms / 60000) % 60
 
 const engine = new AudioEngine();
 
+// Audio-clock lag vs wall clock (ms): grows if the audio thread stalls. Reset whenever the clock restarts.
+let clk = { c: 0, p: 0 };
+const resetClock = () => { if (engine.ctx) clk = { c: engine.ctx.currentTime, p: performance.now() }; };
+// Browser underrun counters, where Brave/Chrome expose them (AudioContext.playoutStats).
+const playout = () => {
+  try {
+    const s = engine.ctx && engine.ctx.playoutStats;
+    return s ? ` fb=${s.fallbackFramesEvents}/${Math.round(s.fallbackFramesDuration)}ms lat=${Math.round(s.averageLatency)}-${Math.round(s.maximumLatency)}ms` : ' po=n/a';
+  } catch { return ' po=err'; }
+};
+
 let lastAlive = 0, lastBeat = 0, lastErr = 0;
 const seq = new Sequencer(engine, {
   onPhrase, onEnd,
@@ -70,10 +81,11 @@ const seq = new Sequencer(engine, {
   onTick: () => {
     const n = Date.now();
     if (n - lastAlive > 30000) { lastAlive = n; alive('tick'); }
-    if (n - lastBeat > 300000) { // heartbeat every 5 min
+    if (n - lastBeat > 120000) { // heartbeat every 2 min
       lastBeat = n;
       const c = engine.ctx, mem = performance.memory ? ` mem=${Math.round(performance.memory.usedJSHeapSize / 1048576)}MB` : '';
-      log(`hb ctx=${c ? c.state : '-'} ct=${c ? Math.round(c.currentTime) : 0} vis=${document.visibilityState}${mem}`);
+      const lag = c ? Math.round((performance.now() - clk.p) - (c.currentTime - clk.c) * 1000) : 0;
+      log(`hb ctx=${c ? c.state : '-'} ct=${c ? Math.round(c.currentTime) : 0} vis=${document.visibilityState} lag=${lag}ms notes=${engine.notes}/${engine.songNotes}${playout()}${mem}`);
     }
   },
 });
@@ -109,12 +121,14 @@ async function play() {
   
   ctx.onstatechange = () => {
     log(`ctx ${ctx.state}`);
+    if (ctx.state === 'running') resetClock();
     // If the system suspends us while we should be playing, try to resume.
     if (ctx === engine.ctx && ctx.state !== 'running' && ctx.state !== 'closed' && state.playing && !state.paused) {
       ctx.resume().catch(() => {});
     }
   };
   
+  resetClock();
   engine.setStyle(style(), levelsFor(style()));
   state.playing = true; state.paused = false;
   state.mode === 'radio' ? nextRadio() : startManual();
@@ -151,6 +165,7 @@ async function resume() {
   engine.setMuted(false);
   session.start();
   await engine.ctx.resume();
+  resetClock();
   renderTransport();
 }
 
@@ -227,7 +242,7 @@ function adopt(song) {
   state.song = song;
   session.setTrack(song);
   if (state.mode === 'radio') { stats.songs++; stats.last = Date.now(); saveStats(); }
-  log(`song ${state.mode === 'radio' ? '#' + stats.songs + ' ' : ''}"${song.title}" ${song.bpm} BPM`);
+  log(`song ${state.mode === 'radio' ? '#' + stats.songs + ' ' : ''}"${song.title}" ${song.bpm} BPM (prev song notes=${engine.songNotes})`);
   state.key = song.key; state.bpm = song.bpm;
   state.prog = song.style.progressions.indexOf(song.progression);
   for (const [id, v] of Object.entries(song.voices)) state.voices[id] = v.name;

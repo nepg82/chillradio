@@ -49,7 +49,7 @@ export class Sequencer {
     this.gapUntil = null;
     this.phraseStarts = [];
     this.next = Math.max(startAt ?? 0, this.engine.ctx.currentTime + 0.1);
-    this.engine.newSong();
+    this.engine.newSong(this.next);
     this.engine.setTempo(song.bpm);
     this.active = true;
     this.tick(); // schedule immediately instead of waiting for the first tick

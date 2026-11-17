@@ -1,6 +1,6 @@
 // instruments.js — generic sound generators ("kinds"). Styles supply parameter
 // presets; nothing here knows about any particular genre.
-// Every kind has the same signature: (ctx, out, t, ev, p)
+// Every kind has the same signature: (ctx, out, t, ev, p)  [see BUS at the bottom for `out`]
 //   ctx = AudioContext, out = destination node, t = start time,
 //   ev  = event {freq, dur, vel, open}, p = preset params from the style.
 
@@ -95,43 +95,43 @@ function hat(ctx, out, t, ev, p) {
 // ---- Subtractive synth (bass / pad / lead / arp / anything tonal) ----------
 // p = { osc:[{type, detune, mult, gain}], filter:{type,freq,q,env,decay},
 //       amp:{a,d,s,r}, vibrato:{rate,depth}, gain }
+// Per note this creates ONLY oscillators, one gain each. The filter is the role's shared tone
+// filter (built once by BUS.synth) and is driven once per strike; vibrato is a pitch curve
+// scheduled on each oscillator. No per-note filters, LFOs or param connections (PRIMER.md,
+// "Audio graph rules"): notes are transient SOURCES into long-lived destinations, never the reverse.
 
-function synth(ctx, out, t, ev, p) {
+function vibratoCurve(base, v, dur) {
+  const n = Math.min(2000, Math.max(2, Math.ceil(dur * 60)));
+  const c = new Float32Array(n);
+  for (let i = 0; i < n; i++) c[i] = base + v.depth * Math.sin(2 * Math.PI * v.rate * dur * i / (n - 1));
+  return c;
+}
+
+function synth(ctx, tone, t, ev, p) {
   const { a = 0.01, d = 0.2, s = 0.6, r = 0.2 } = p.amp || {};
   const dur = Math.max(ev.dur, a + 0.02);
-  const end = t + dur;
+  const end = t + dur, stopAt = end + r * 2;
   const peak = ev.vel * (p.gain ?? 0.2);
 
-  const amp = ctx.createGain();
-  amp.gain.setValueAtTime(0.0001, t);
-  amp.gain.linearRampToValueAtTime(peak, t + a);
-  amp.gain.setTargetAtTime(peak * s, t + a, d / 3);
-  amp.gain.setTargetAtTime(0, end, r / 3);
-
-  const fp = p.filter || {};
-  const flt = filter(ctx, fp.type || 'lowpass', (fp.freq || 4000) + (fp.env || 0), fp.q || 0.7);
-  if (fp.env) flt.frequency.setTargetAtTime(fp.freq || 4000, t, (fp.decay || 0.3) / 3);
-  flt.connect(amp).connect(out);
-
-  const stopAt = end + r * 1.5;
-  let lfo;
-  if (p.vibrato) {
-    lfo = ctx.createOscillator();
-    lfo.frequency.value = p.vibrato.rate;
-    lfo.start(t); lfo.stop(stopAt);
+  if (tone.lastT !== t) { // chord notes share one strike time, so the filter is set once per strike
+    tone.lastT = t;
+    const fp = p.filter || {}, base = fp.freq || 4000, type = fp.type || 'lowpass';
+    if (tone.type !== type) tone.type = type;
+    tone.Q.setValueAtTime(fp.q || 0.7, t);
+    tone.frequency.setValueAtTime(base + (fp.env || 0), t);
+    if (fp.env) tone.frequency.setTargetAtTime(base, t, (fp.decay || 0.3) / 3);
   }
   for (const spec of p.osc) {
-    const o = ctx.createOscillator(), g = ctx.createGain();
+    const o = ctx.createOscillator(), g = ctx.createGain(), pk = peak * (spec.gain ?? 1);
     o.type = spec.type;
     o.frequency.value = ev.freq * (spec.mult || 1);
-    o.detune.value = spec.detune || 0;
-    g.gain.value = spec.gain ?? 1;
-    if (lfo) {
-      const depth = ctx.createGain();
-      depth.gain.value = p.vibrato.depth; // cents
-      lfo.connect(depth).connect(o.detune);
-    }
-    o.connect(g).connect(flt);
+    if (p.vibrato) o.detune.setValueCurveAtTime(vibratoCurve(spec.detune || 0, p.vibrato, stopAt - t), t, stopAt - t);
+    else o.detune.value = spec.detune || 0;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(pk, t + a);
+    g.gain.setTargetAtTime(pk * s, t + a, d / 3);
+    g.gain.setTargetAtTime(0, end, r / 3);
+    o.connect(g).connect(tone);
     o.start(t); o.stop(stopAt);
   }
 }
@@ -139,3 +139,15 @@ function synth(ctx, out, t, ev, p) {
 // Registry: styles reference these by name via role.kind. To add a new kind
 // (e.g. a wobble bass), add a function here.
 export const KINDS = { kick, snare, hat, synth };
+
+// Buses: a kind that needs processing shared by all its notes declares it here. setStyle() calls
+// BUS[kind](ctx, out, keep) once per role and passes the returned node to the kind as its `out`.
+// Kinds without an entry just receive the role's gain node.
+export const BUS = {
+  synth(ctx, out, keep) {
+    const f = keep(ctx.createBiquadFilter());
+    f.type = 'lowpass'; f.frequency.value = 4000; f.Q.value = 0.7;
+    f.connect(out);
+    return f;
+  },
+};

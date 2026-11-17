@@ -1,6 +1,6 @@
 // audio.js — owns the AudioContext, master bus, per-role channels and shared FX.
 import { dbToGain } from './music.js';
-import { KINDS } from './instruments.js';
+import { KINDS, BUS } from './instruments.js';
 
 export const MIN_DB = -24; // anything below this is "Off"
 const levelGain = db => (db < MIN_DB ? 0 : dbToGain(db));
@@ -24,6 +24,9 @@ export class AudioEngine {
   styleId = null;
   reverbOn = true;   // set by the app before Play; takes effect when the graph is next built
   irCache = {};
+  outs = {};         // roleId -> node notes are sent to (a shared bus, or the role's song gain)
+  notes = 0;         // notes scheduled this session / this song (diagnostics)
+  songNotes = 0;
 
   // Must be called from a user gesture the first time. The context is created once and reused.
   async start() {
@@ -33,11 +36,12 @@ export class AudioEngine {
       comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 4;
       this.master = ctx.createGain();
       this.master.connect(comp).connect(ctx.destination);
-      this.nodes = []; this.songGains = {}; this.channels = {}; this.styleId = null; this.irCache = {};
+      this.nodes = []; this.songGains = {}; this.outs = {}; this.channels = {}; this.styleId = null; this.irCache = {};
     } else if (this.tearTimer) { // Stop was pressed moments ago: finish its cleanup now
       clearTimeout(this.tearTimer); this.tearTimer = null;
       this._teardown();
     }
+    this.notes = 0; this.songNotes = 0;
     const now = this.ctx.currentTime;
     this.master.gain.cancelScheduledValues(now);
     this.master.gain.setValueAtTime(0.8, now);
@@ -60,7 +64,7 @@ export class AudioEngine {
   _teardown() {
     Object.values(this.songGains).forEach(g => g.disconnect());
     this.nodes.forEach(n => n.disconnect());
-    this.nodes = []; this.songGains = {}; this.channels = {}; this.styleId = null;
+    this.nodes = []; this.songGains = {}; this.outs = {}; this.channels = {}; this.styleId = null;
   }
 
   // Build reverb, delay and one channel per role for a style.
@@ -85,7 +89,7 @@ export class AudioEngine {
     this.delayBeats = fx.delay.beats;
     dly.connect(lp); lp.connect(fb); fb.connect(dly); lp.connect(this.master);
 
-    this.channels = {};
+    this.channels = {}; this.songGains = {}; this.outs = {};
     for (const role of style.roles) {
       const input = keep(ctx.createGain());
       input.gain.value = levelGain(levels[role.id]);
@@ -98,6 +102,12 @@ export class AudioEngine {
       send(rev, role.send?.rev);
       send(dly, role.send?.dly);
       this.channels[role.id] = input;
+      // Persistent per-role song gain (faded for "Next song", reset by newSong) feeding the channel,
+      // then the shared bus for the kind (if any). Nothing is created per song or per note here.
+      const sg = keep(ctx.createGain());
+      sg.connect(input);
+      this.songGains[role.id] = sg;
+      this.outs[role.id] = BUS[role.kind] ? BUS[role.kind](ctx, sg, keep) : sg;
     }
     this.styleId = style.id;
   }
@@ -116,16 +126,14 @@ export class AudioEngine {
     if (this.ctx) this.master.gain.setTargetAtTime(on ? 0 : 0.8, this.ctx.currentTime, 0.05);
   }
 
-  // A fresh gain stage per role for each song, so a song can be faded out as a unit.
-  newSong() {
-    const old = this.songGains || {};
-    setTimeout(() => Object.values(old).forEach(g => g.disconnect()), 15000);
-    this.songGains = {};
-    for (const [id, ch] of Object.entries(this.channels)) {
-      const g = this.ctx.createGain();
-      g.connect(ch);
-      this.songGains[id] = g;
+  // New song at audio time `at`: undo any "Next song" fade. Gains are reused, never recreated.
+  newSong(at) {
+    const now = this.ctx.currentTime;
+    for (const g of Object.values(this.songGains)) {
+      g.gain.cancelScheduledValues(now);
+      g.gain.setValueAtTime(1, Math.max(at ?? now, now));
     }
+    this.songNotes = 0;
   }
 
   // Fade the current song to silence, finishing exactly at audio time `at`.
@@ -137,6 +145,7 @@ export class AudioEngine {
   }
 
   play(role, t, ev, voice) {
-    KINDS[role.kind](this.ctx, this.songGains[role.id], t, ev, voice.p);
+    this.notes++; this.songNotes++;
+    KINDS[role.kind](this.ctx, this.outs[role.id], t, ev, voice.p);
   }
 }
