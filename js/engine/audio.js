@@ -88,6 +88,11 @@ export class AudioEngine {
       conv.buffer = this.irCache[style.id] ||= impulse(ctx, fx.reverb.seconds, fx.reverb.decay);
       conv.connect(out);
       rev = conv;
+      if (fx.reverb.hp) { // optional high-pass in front of the reverb so low notes don't pile up in the tail
+        const hp = keep(ctx.createBiquadFilter());
+        hp.type = 'highpass'; hp.frequency.value = fx.reverb.hp; hp.connect(conv);
+        rev = hp;
+      }
     }
 
     const dly = (this.dly = keep(ctx.createDelay(4)));

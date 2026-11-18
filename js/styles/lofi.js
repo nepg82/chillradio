@@ -1,7 +1,8 @@
 // lofi.js — Lofi hip-hop. Written from scratch for Chill Radio, sound modelled on the "Lofi loop machine".
 // Soft swung boom-bap drums, a sine bass, voice-led 7th/9th chord stabs (strummed), a warm pad and a
 // sparse melody. A slow shared pitch wobble (0.35 Hz, ±14 cents, phase-locked to the audio clock) drifts
-// the keys, pad and lead together, and the whole mix is low-passed at 5.5 kHz.
+// the keys, pad and lead together, and the whole mix is low-passed at 5.5 kHz. Registers are kept apart on
+// purpose: bass MIDI 36-47, pad from 50, keys from 57 (a lower pad turned the low mids to mud).
 // See PRIMER.md for the style schema.
 
 const c = (r, t) => ({ r, t });
@@ -23,7 +24,7 @@ export default {
 
   fx: {
     tone: 5500,
-    reverb: { seconds: 2.0, decay: 3 },
+    reverb: { seconds: 2.0, decay: 3, hp: 250 },
     delay: { beats: 0.75, feedback: 0.3, lp: 1600 },
   },
 
@@ -75,7 +76,7 @@ export default {
       ],
     },
     {
-      id: 'keys', label: 'Keys', part: 'comp', kind: 'synth', mix: 0, lo: 50, voiceLead: true, rootless: true, send: { rev: 0.2 },
+      id: 'keys', label: 'Keys', part: 'comp', kind: 'synth', mix: 0, lo: 57, voiceLead: true, rootless: true, send: { rev: 0.2 },
       patterns: [
         bars('7.....3...3...3.', '7.....3...3.....'),
         bars('7.....3...3.....', '7.........3...3.'),
@@ -89,11 +90,11 @@ export default {
       ],
     },
     {
-      id: 'pad', label: 'Pad', part: 'chord', kind: 'synth', mix: 0, lo: 38, voiceLead: true, rootless: true, send: { rev: 0.35 },
+      id: 'pad', label: 'Pad', part: 'chord', kind: 'synth', mix: 0, lo: 50, voiceLead: true, rootless: true, send: { rev: 0.35 },
       voices: [
-        { name: 'Warm Tri',  p: { osc: [osc('triangle', 1, -7), osc('triangle', 1, 7)], filter: { freq: 1000, q: 0.3 }, vibrato: wobble, amp: { a: 0.6, d: 0.1, s: 1, r: 1.05 }, gain: 0.0625 } },
-        { name: 'Sine Pad',  p: { osc: [osc('sine', 1, -7), osc('sine', 1, 7)],         filter: { freq: 1000, q: 0.3 }, vibrato: wobble, amp: { a: 0.6, d: 0.1, s: 1, r: 1.05 }, gain: 0.08 } },
-        { name: 'Dusty Saw', p: { osc: [osc('sawtooth', 1, -7), osc('sawtooth', 1, 7)], filter: { freq: 700, q: 0.3 },  vibrato: wobble, amp: { a: 0.6, d: 0.1, s: 1, r: 1.05 }, gain: 0.03 } },
+        { name: 'Warm Tri',  p: { osc: [osc('triangle', 1, -7), osc('triangle', 1, 7)], filter: { freq: 1000, q: 0.3 }, vibrato: wobble, amp: { a: 0.6, d: 0.1, s: 1, r: 0.7 }, gain: 0.0625 } },
+        { name: 'Sine Pad',  p: { osc: [osc('sine', 1, -7), osc('sine', 1, 7)],         filter: { freq: 1000, q: 0.3 }, vibrato: wobble, amp: { a: 0.6, d: 0.1, s: 1, r: 0.7 }, gain: 0.08 } },
+        { name: 'Dusty Saw', p: { osc: [osc('sawtooth', 1, -7), osc('sawtooth', 1, 7)], filter: { freq: 700, q: 0.3 },  vibrato: wobble, amp: { a: 0.6, d: 0.1, s: 1, r: 0.7 }, gain: 0.03 } },
       ],
     },
     {
