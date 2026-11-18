@@ -105,10 +105,14 @@ function hat(ctx, out, t, ev, p) {
 // scheduled on each oscillator. No per-note filters, LFOs or param connections (PRIMER.md,
 // "Audio graph rules"): notes are transient SOURCES into long-lived destinations, never the reverse.
 
-function vibratoCurve(base, v, dur) {
-  const n = Math.min(2000, Math.max(2, Math.ceil(dur * 60)));
+// Pitch curve for one oscillator. v.sync = true locks the phase to the audio clock, so every note
+// wobbles together like one shared LFO (tape-style wow) without wiring anything between nodes.
+function vibratoCurve(base, v, dur, t0) {
+  const pps = Math.min(60, Math.max(10, v.rate * 12));
+  const n = Math.min(2000, Math.max(2, Math.ceil(dur * pps)));
+  const ph = v.sync ? 2 * Math.PI * v.rate * t0 : 0;
   const c = new Float32Array(n);
-  for (let i = 0; i < n; i++) c[i] = base + v.depth * Math.sin(2 * Math.PI * v.rate * dur * i / (n - 1));
+  for (let i = 0; i < n; i++) c[i] = base + v.depth * Math.sin(2 * Math.PI * v.rate * dur * i / (n - 1) + ph);
   return c;
 }
 
@@ -133,7 +137,7 @@ function synth(ctx, out, t, ev, p) {
     const o = ctx.createOscillator(), g = ctx.createGain(), pk = peak * (spec.gain ?? 1);
     o.type = spec.type;
     o.frequency.value = ev.freq * (spec.mult || 1);
-    if (p.vibrato) o.detune.setValueCurveAtTime(vibratoCurve(spec.detune || 0, p.vibrato, stopAt - t), t, stopAt - t);
+    if (p.vibrato) o.detune.setValueCurveAtTime(vibratoCurve(spec.detune || 0, p.vibrato, stopAt - t, t), t, stopAt - t);
     else o.detune.value = spec.detune || 0;
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(pk, t + a);

@@ -19,13 +19,14 @@ const state = {
   allStyles: !!saved.allStyles,
   reverb: saved.reverb !== false,
   levels: saved.levels || {},          // { styleId: { roleId: dB } }
+  userSwing: saved.userSwing ?? null,   // fraction of a 16th; null = style default
   userBpm: saved.userBpm || null,      // set once the user touches BPM
   bpm: 0, key: Math.floor(Math.random() * 12), prog: 0, voices: {},
   song: null, playing: false, paused: false, yielded: false,
 };
 const save = () => {
-  const { mode, styleId, allStyles, levels, userBpm, reverb } = state;
-  try { localStorage.setItem('chillradio', JSON.stringify({ mode, styleId, allStyles, levels, userBpm, reverb })); } catch {}
+  const { mode, styleId, allStyles, levels, userBpm, userSwing, reverb } = state;
+  try { localStorage.setItem('chillradio', JSON.stringify({ mode, styleId, allStyles, levels, userBpm, userSwing, reverb })); } catch {}
 };
 
 const style = () => STYLES.find(s => s.id === state.styleId) || STYLES[0];
@@ -321,8 +322,16 @@ function renderStyle() {
   syncControls();
 }
 
+const swingPct = () => Math.round((state.userSwing ?? style().swing) * 100);
+function renderSwing() {
+  $('#swing').value = swingPct();
+  $('#swing-out').textContent = swingPct() + '%' + (state.userSwing == null ? ' (style default)' : '');
+  $('#swing-reset').hidden = state.userSwing == null;
+}
+
 function syncControls() {
   const st = style();
+  renderSwing();
   $('#bpm').textContent = state.bpm;
   $('#key').value = state.key;
   $('#prog').value = state.prog;
@@ -343,6 +352,9 @@ $('#key').onchange = e => { state.key = +e.target.value; rebuild(); };
 $('#prog').onchange = e => { state.prog = +e.target.value; rebuild(); };
 $('#bpm-down').onclick = () => setBpm(state.bpm - 1);
 $('#bpm-up').onclick = () => setBpm(state.bpm + 1);
+seq.swing = state.userSwing;
+$('#swing').oninput = e => { state.userSwing = e.target.value / 100; seq.swing = state.userSwing; save(); renderSwing(); };
+$('#swing-reset').onclick = () => { state.userSwing = null; seq.swing = null; save(); renderSwing(); };
 $('#all-styles').onchange = e => { state.allStyles = e.target.checked; save(); };
 $('#reverb').onchange = e => { state.reverb = e.target.checked; engine.reverbOn = state.reverb; save(); restart(); };
 document.querySelectorAll('[data-mode]').forEach(b => (b.onclick = () => setMode(b.dataset.mode)));

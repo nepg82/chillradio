@@ -5,7 +5,7 @@
 > stability problem, and the rules we've set. **Claude: update this file at the end of every step**
 > (changelog, status, build stamp, open issues) and give the user the updated copy.
 
-Last updated: **Step 2a — build `261117-2a`, service-worker cache `chill-radio-v0.2.1`**
+Last updated: **Step 3a — build `261117-3`, service-worker cache `chill-radio-v0.3.0`**
 
 ---
 
@@ -29,7 +29,7 @@ Last updated: **Step 2a — build `261117-2a`, service-worker cache `chill-radio
 | Task | Files to attach |
 |---|---|
 | Anything / general | `PRIMER.md` (+ `index.html`, `js/app.js` if UI-related) |
-| New style ("make me a Vaporwave") | `PRIMER.md`, the closest existing style file (e.g. `js/styles/synthwave.js`; `chillwave.js` if it needs a melody), `js/styles/scenes.js`, `js/engine/parts.js`, `js/engine/instruments.js`, `js/engine/radio.js`, `js/styles/index.js`. Remember to add the new file to `ASSETS` in `sw.js` |
+| New style ("make me a Vaporwave") | `PRIMER.md`, the closest existing style file (e.g. `js/styles/synthwave.js` for beat-driven styles, `js/styles/lofi.js` for chord/keys-driven ones; `chillwave.js` for motif melodies), `js/styles/scenes.js`, `js/engine/parts.js`, `js/engine/instruments.js`, `js/engine/radio.js`, `js/styles/index.js`. Remember to add the new file to `ASSETS` in `sw.js` |
 | Stability / glitch investigation | `PRIMER.md`, `js/engine/audio.js`, `js/engine/instruments.js`, `js/engine/sequencer.js`, `js/app.js`, `js/mediasession.js`, **plus the log text** from the phone |
 | UI / look | `PRIMER.md`, `index.html`, `css/style.css`, `js/app.js` |
 | Not sure | Zip the whole folder (it's small, ~100 KB without icons) |
@@ -71,10 +71,18 @@ behind the lock screen** and respond to Bluetooth play/pause/next. Sound should 
 | 1 | Scaffold Chill Radio from Synth Radio; scheduler `try/catch`; hidden lookahead 1.5 s; drop forced 32 kHz; stereo reverb + toggle; diagnostics; new palette; rename | **Done** (built, laptop-tested) |
 | 1a | **Stability rework** of the voice engine (see §5) after the phone glitched; richer diagnostics; this primer | **Done.** User reported several hours on the phone behind the lock screen with no glitches (previously it failed). Promising, not yet proven by a full overnight run — keep checking logs |
 | 2 | Port **Synthwave** and **Darksynth** from Chillforge into style files, with the engine additions they need (bass drive, filter sweep, arp random walks, scenes), following the graph rules | **Done — awaiting listening/phone test** |
-| 3 | **Lofi** style from the loop machine; Swing as a real slider (now a fixed per-style constant); **Auto-cycle** for Manual mode; generalize the **visualizer** to any style's roles | Not started |
+| 3a | **Lofi** style (written from scratch, sound modelled on the loop machine) + user **Swing slider** | **Done — awaiting listening/phone test** |
+| 3b | **Auto-cycle** (loop machine: regenerate the loop every N minutes). Intended for Manual mode, which otherwise loops one song forever; Radio mode already advances songs | Not started |
+| ~~3c~~ | ~~Visualizer~~ | **Dropped by decision** (see §8). Revisit only if wanted |
 | 4 | Sound & melody pass: layered detune, soft saturation, better reverb; melody generator with motif repetition/variation, rests, chord-tone targeting; maybe a brightness/warmth control for bone-conduction | Not started |
 
 ### Changelog
+- **3a (`261117-3`)** — **Lofi** style (`js/styles/lofi.js`) and a **Swing slider** (0–50% of a 16th; a value you set sticks across styles until you tap "Use style default"; stored as `userSwing`, applied via `Sequencer.swing`). Engine additions (graph rules respected; the only new persistent node is the optional style tone filter):
+  - `voiceLead(prev, notes, lo)` in `music.js` + `voicing()` in `parts.js`: role flag `voiceLead: true` makes `chord` and `comp` roles move to the nearest inversion of each chord (computed once per chord, state in `song.rt[roleId]`). 9th chords sit above the octave, so inversions are re-sorted each rotation (a bug the tests caught).
+  - New part **`comp`**: strummed chord stabs. Pattern digits = hit length in steps, `.` = rest. Notes carry `ev.dt` (seconds); the sequencer schedules at `t + dt`.
+  - Bass: `role.lo` (lowest root) and `role.maxHold` (cap note length in steps). 
+  - **Wobble**: voice `vibrato: { rate, depth, sync: true }` phase-locks the pitch curve to the audio clock, so all notes drift together like the loop machine's single shared LFO (0.35 Hz, ±14 cents) **without** any node-to-node connection (the loop machine's `wobG.connect(osc.detune)` is the pattern removed in 1a). Curve resolution is now `clamp(rate*12, 10, 60)` points/s (was a fixed 60).
+  - `fx.tone`: optional style-wide low-pass (Lofi: 5500 Hz, as in the loop machine) between all channels/sends and the master.
 - **2a (`261117-2a`)** — Service-worker fix. Symptom: on the phone (GitHub Pages) the new build stamp showed but the new styles didn't appear in the menu (a private tab was fine). Cause (most likely): `cache.addAll()` honours the browser HTTP cache, and GitHub Pages sends `max-age=600`, so a stale `index.js` was stored under the new cache name. Fix: install fetches with `cache: 'reload'`; fetch handler is now network-first (`no-cache` revalidation, 4 s timeout) with the cached copy as the offline fallback. Offline use still works; updates no longer depend on a cache-name bump landing cleanly. No audio/engine changes.
 - **2 (`261117-2`)** — Added **Synthwave** and **Darksynth** (`js/styles/synthwave.js`, `darksynth.js`) and `js/styles/scenes.js`. Engine additions, all within the graph rules (no new per-note nodes; the only new persistent node is one WaveShaper on the Darksynth bass bus):
   - `BUS.synth(ctx, out, keep, role)`: optional `role.drive` puts a soft-clip WaveShaper (tanh, oversample 2x) in front of the role's shared filter. The bus input is then the shaper and the filter hangs off it as `.tone`; `synth()` writes notes to `out` and drives `out.tone || out`.
@@ -110,6 +118,7 @@ js/styles/chillwave.js  Chillwave (the template for new styles; melodic, uses mo
 js/styles/synthwave.js  Synthwave (arp + bass + supersaw pad; uses scenes)
 js/styles/darksynth.js  Darksynth (adds bass drive + sweep, gated snare, eighth-note arp)
 js/styles/scenes.js     radio.decorate helper: Chillforge-style auto-mute scenes
+js/styles/lofi.js       Lofi (swung boom-bap, voice-led strummed keys, pad, sparse melody, tone filter, wobble)
 ```
 
 **Signal flow:** note → (`KINDS` function creates oscillators/noise) → role bus (`outs[role]`: shared tone filter for
@@ -176,10 +185,12 @@ export default {
   radio: { groups: [[roleIds]...], openers: [[...]], dropout: 0.35, decorate?(plan, {song,R,groups}) },
 };
 ```
-- **`part`** (parts.js → note events): `drum | bass | chord | arp | melody`.
+- **`part`** (parts.js → note events): `drum | bass | chord | comp | arp | melody`.
 - **`kind`** (instruments.js → sound): `kick | snare | hat | synth`. Params:
   - kick `{f0,f1,sweep,decay,gain,lp?,click?}` · snare `{noiseFreq,q?,decay,gain,tone?,toneDecay?,toneGain?,clap?}` · hat `{freq,decay,openDecay,gain}`
   - synth `{ osc:[{type,gain,detune,mult}], filter:{type?,freq,q?,env?,decay?}, amp:{a,d,s,r}, vibrato?:{rate,depth}, gain }`
+- **Role fields (Lofi):** `voiceLead: true` (chord/comp roles: nearest-inversion voicing), `maxHold` (bass: cap note length in steps), and `lo` also applies to bass. Part `comp`: pattern digits are hit lengths in steps (`7.....3...3...3.`); the chord is strummed low→high. Events may carry `dt` (seconds offset).
+- **Style fields:** `fx.tone` (Hz, optional style-wide low-pass). Voice `vibrato.sync: true` = phase-locked shared wobble (see changelog 3a).
 - **Optional role fields:** `accent` (bass/arp: off-beat notes softer), `lo` (chord/arp: lowest root MIDI note), `noteLen` (arp: note length in steps), `drive` (synth: distortion amount in front of the shared filter, e.g. 5). Synth `filter` may also have `sweep: [lo, hi]`. Snare params may have `gate` (seconds).
 - **Pattern characters:** drum `x g o . ? ,` (`?` = 35% strong hit, `,` = 60% ghost); bass `r 5 o .`; arp digits (index into chord tones, wrapping up an octave), `.`, or `~wander` / `~scatter` (+ step-interval digit) for random walks.
 - **Chord types** also include `minS`/`majS` (spread triads). Transposable relative progressions only: Chillforge's progressions that differed only by key were merged (see §8).
@@ -213,7 +224,8 @@ export default {
 - Synthwave additions beyond Chillforge: four-on-the-floor kick pattern and octave-bounce bass pattern as variety.
 - Likely first things to tune by ear (levels are approximations of Chillforge's, since Chill Radio's mixer is per role and its hat/snare kinds are slightly different): hat levels and open/closed balance, snare tone, bass vs kick balance, pad/arp reverb sends, scene frequency.
 - Voice tuning pass planned after all steps (user will tune voicing options).
-- Visualizer for Step 3 must be generic over a style's roles (the loop machine's is a fixed 3-row drum grid + chord bar, synced to the audio clock with output-latency compensation).
+- **Visualizer: dropped (user decision, Step 3 planning).** The app mostly runs in a pocket behind the lock screen, so the CPU/battery cost and the build effort aren't worth it. If ever revisited: canvas only, must stop all drawing and timers when `document.hidden`, driven from the audio clock (the loop machine's was a fixed 3-row drum grid + chord bar with output-latency compensation), and it must never touch the audio graph.
+- Lofi notes: Chill Radio phrases are 2 bars per chord (the loop machine used 1 bar), so patterns are 32 steps (two bars). The loop machine's per-bar random drum/bass/comp variation is replaced by per-song picks among two-bar patterns. Levels in the Lofi voices were derived from the loop machine's bus gains (chord bus ×0.5, drum bus ×0.9, etc.) and are approximations to tune by ear. Lofi's default swing is 20% (the loop machine's default).
 
 ## 9. Testing notes (for Claude)
 - Node can sanity-check logic but not audio: copy the project, add `{"type":"module"}` package.json, `node --check` all modules, and run a fake-`AudioContext` test (count `createBiquadFilter` / `createOscillator` over thousands of ticks; the 1a invariant is that biquad count is **constant** while notes grow).

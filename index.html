@@ -21,7 +21,7 @@
       <div class="titlebar">
         <h1 id="title">Ready</h1>
         <!-- build stamp: tap to show the event log -->
-        <span class="build" id="ver">261117-2051</span>
+        <span class="build" id="ver">261117-3</span>
       </div>
       <p id="meta"></p>
       <p id="section">Stopped</p>
@@ -50,6 +50,11 @@
         <output id="bpm">0</output>
         <button id="bpm-up" aria-label="Faster">+</button>
       </div>
+    </div>
+
+    <div class="field">Swing <output id="swing-out"></output>
+      <input type="range" id="swing" min="0" max="50" step="1" aria-label="Swing">
+      <button id="swing-reset" type="button" hidden>Use style default</button>
     </div>
 
     <section id="mixer" aria-label="Instruments"></section>

@@ -26,6 +26,8 @@ export class Sequencer {
   endAt = null;         // audio-clock time a "Next song" fade ends the song
   phraseStarts = [];    // audio-clock start times of scheduled phrases
 
+  swing = null; // user override (fraction of a 16th); null = the style's own swing
+
   constructor(engine, { onPhrase, onEnd, onResync, onTick, onError }) {
     this.engine = engine;
     this.cb = { onPhrase, onEnd, onResync, onTick, onError };
@@ -105,7 +107,7 @@ export class Sequencer {
         this.phraseStarts.push(this.next);
         this.cb.onPhrase(this.phrase, idx);
       }
-      const swing = s % 2 ? song.style.swing * stepDur : 0;
+      const swing = s % 2 ? (this.swing ?? song.style.swing) * stepDur : 0;
       try { this.playStep(s, this.next + swing, stepDur); }
       catch (e) { this.cb.onError?.(e, this.step); }
       this.next += stepDur;
@@ -121,7 +123,7 @@ export class Sequencer {
     for (const role of song.style.roles) {
       if (!phrase.active.has(role.id)) continue;
       const events = PARTS[role.part]({ song, role, pat: song.patterns[role.id], s, chord, ci, stepDur });
-      for (const ev of events) this.engine.play(role, t, ev, song.voices[role.id]);
+      for (const ev of events) this.engine.play(role, t + (ev.dt || 0), ev, song.voices[role.id]);
     }
   }
 

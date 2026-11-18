@@ -3,7 +3,7 @@
 // To add a new behaviour (e.g. a wobble bass), add a function here.
 // Every part receives a context object c = { song, role, pat, s, chord, ci, stepDur }
 //   s = step within the 2-bar phrase (0–31), ci = chord index in the progression.
-import { chordMidi, mtof, fold } from './music.js';
+import { chordMidi, mtof, fold, voiceLead } from './music.js';
 
 // Steps from s until the next non-rest character (cyclic).
 const hold = (pat, s) => {
@@ -11,6 +11,14 @@ const hold = (pat, s) => {
   while (n < pat.length && pat[(s + n) % pat.length] === '.') n++;
   return n;
 };
+
+// Voice-led voicing for a role (role.voiceLead): computed once per chord, then reused for the whole phrase.
+function voicing(song, role, chord, ci, s) {
+  const st = (song.rt[role.id] ||= {});
+  if (st.ci !== ci || s < st.s) { st.notes = voiceLead(st.notes, chordMidi(song.key, chord, 0), role.lo ?? 50); st.ci = ci; }
+  st.s = s;
+  return st.notes;
+}
 
 export const PARTS = {
   // x = hit, g = ghost (quiet), o = open (hats), . = rest
@@ -27,15 +35,15 @@ export const PARTS = {
   bass({ song, role, pat, s, chord, ci, stepDur }) {
     const off = { r: 0, 5: 7, o: 12 }[pat[s % pat.length]];
     if (off === undefined) return [];
-    const root = fold(song.key + chord.r, 28);
-    return [{ freq: mtof(root + off), dur: hold(pat, s) * stepDur * 0.92, vel: role.accent && s % 4 ? 0.76 : 1,
+    const root = fold(song.key + chord.r, role.lo ?? 28);
+    return [{ freq: mtof(root + off), dur: Math.min(hold(pat, s), role.maxHold ?? 99) * stepDur * 0.92, vel: role.accent && s % 4 ? 0.76 : 1,
       pos: (ci * 32 + s) / (32 * song.progression.chords.length) }];
   },
 
   // Sustained chord, struck once per 2-bar phrase.
-  chord({ song, role, s, chord, stepDur }) {
+  chord({ song, role, s, chord, ci, stepDur }) {
     if (s) return [];
-    return chordMidi(song.key, chord, role.lo ?? 55).map(m => ({ freq: mtof(m), dur: 32 * stepDur, vel: 0.8 }));
+    return (role.voiceLead ? voicing(song, role, chord, ci, s) : chordMidi(song.key, chord, role.lo ?? 55)).map(m => ({ freq: mtof(m), dur: 32 * stepDur, vel: 0.8 }));
   },
 
   // Digits index into the chord tones (wrapping up an octave); . = rest.
@@ -69,6 +77,14 @@ export const PARTS = {
     if (ch === '.') return [];
     const i = +ch;
     return [{ freq: mtof(tones[i % tones.length] + 12 * Math.floor(i / tones.length)), dur, vel }];
+  },
+
+  // Plucked chord stabs. Each digit is a hit whose value is its length in steps; . = rest.
+  // The chord is strummed low to high a few ms apart (ev.dt). Use with role.voiceLead + role.lo.
+  comp({ song, role, pat, s, chord, ci, stepDur }) {
+    const d = +pat[s % pat.length];
+    if (!d) return [];
+    return voicing(song, role, chord, ci, s).map((m, n) => ({ freq: mtof(m), dur: d * stepDur, vel: 0.8, dt: n * 0.014 + Math.random() * 0.008 }));
   },
 
   // Pre-generated motif per chord (see song.js).

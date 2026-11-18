@@ -56,3 +56,17 @@ export function scaleMidi(key, scale, lo, hi) {
   }
   return out;
 }
+
+// Voice-leading: of all inversions of `notes` (root position, ascending MIDI) whose lowest note falls in
+// [lo, lo+11], return the one closest to `prev` (the previous voicing, or none -> a middle inversion).
+export function voiceLead(prev, notes, lo) {
+  const cands = []; let cur = notes.slice().sort((a, b) => a - b); // 9ths sit above the octave, so keep sorted
+  for (let k = 0; k < cur.length; k++) {
+    const shift = 12 * Math.ceil((lo - cur[0]) / 12);
+    cands.push(cur.map(n => n + shift));
+    cur = [...cur.slice(1), cur[0] + 12].sort((a, b) => a - b);
+  }
+  if (!prev) return cands[Math.min(1, cands.length - 1)];
+  const cost = v => v.reduce((a, n) => a + Math.min(...prev.map(p => Math.abs(p - n))), 0);
+  return cands.reduce((b, v) => (cost(v) < cost(b) ? v : b));
+}

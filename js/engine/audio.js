@@ -75,11 +75,18 @@ export class AudioEngine {
     this.nodes = [];
     const keep = n => (this.nodes.push(n), n);
 
+    let out = this.master;
+    if (fx.tone) { // optional style-wide low-pass (e.g. Lofi's dulled top end)
+      const tone = keep(ctx.createBiquadFilter());
+      tone.type = 'lowpass'; tone.frequency.value = fx.tone; tone.Q.value = 0.4;
+      tone.connect(this.master); out = tone;
+    }
+
     let rev = null;
     if (this.reverbOn && fx.reverb) {
       const conv = keep(ctx.createConvolver());
       conv.buffer = this.irCache[style.id] ||= impulse(ctx, fx.reverb.seconds, fx.reverb.decay);
-      conv.connect(this.master);
+      conv.connect(out);
       rev = conv;
     }
 
@@ -87,13 +94,13 @@ export class AudioEngine {
     const fb = keep(ctx.createGain()); fb.gain.value = fx.delay.feedback;
     const lp = keep(ctx.createBiquadFilter()); lp.frequency.value = fx.delay.lp;
     this.delayBeats = fx.delay.beats;
-    dly.connect(lp); lp.connect(fb); fb.connect(dly); lp.connect(this.master);
+    dly.connect(lp); lp.connect(fb); fb.connect(dly); lp.connect(out);
 
     this.channels = {}; this.songGains = {}; this.outs = {};
     for (const role of style.roles) {
       const input = keep(ctx.createGain());
       input.gain.value = levelGain(levels[role.id]);
-      input.connect(this.master);
+      input.connect(out);
       const send = (dest, amt) => {
         if (!amt || !dest) return;
         const g = keep(ctx.createGain()); g.gain.value = amt;
