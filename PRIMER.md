@@ -5,7 +5,7 @@
 > stability problem, and the rules we've set. **Claude: update this file at the end of every step**
 > (changelog, status, build stamp, open issues) and give the user the updated copy.
 
-Last updated: **Step 2 — build `261117-2`, service-worker cache `chill-radio-v0.2.0`**
+Last updated: **Step 2a — build `261117-2a`, service-worker cache `chill-radio-v0.2.1`**
 
 ---
 
@@ -20,7 +20,7 @@ Last updated: **Step 2 — build `261117-2`, service-worker cache `chill-radio-v
 ### Deploy and test on the phone (Android, Brave)
 1. Push the folder to its own GitHub repo, enable GitHub Pages (HTTPS is required for the service worker).
 2. Open the Pages URL in Brave, install as a PWA. Use a different repo/path than Synth Radio / Chillforge so they stay separate installs.
-3. After every deploy, check the **build stamp** (top right of the app) matches what was pushed. If not, fully close and reopen the app once or twice (the service worker serves cached files until the new one activates).
+3. After every deploy, check the **build stamp** (since 2a the app fetches fresh files whenever it's online, so it should update on the next launch; the update to 2a itself may need one extra close-and-reopen) (top right of the app) matches what was pushed. If not, fully close and reopen the app once or twice (the service worker serves cached files until the new one activates).
 4. Brave → Settings → Apps → Brave → Battery → **Unrestricted** (Motorola/Android otherwise kills background audio).
 5. The real test: start **Radio** mode, lock the screen, let it run hours (overnight is ideal), Bluetooth connected if possible. Try play/pause/next from the headphones.
 6. Afterward, **tap the build stamp**: it shows the event log and copies it to the clipboard. Paste the log into the chat — **whether it went well or badly**.
@@ -75,6 +75,7 @@ behind the lock screen** and respond to Bluetooth play/pause/next. Sound should 
 | 4 | Sound & melody pass: layered detune, soft saturation, better reverb; melody generator with motif repetition/variation, rests, chord-tone targeting; maybe a brightness/warmth control for bone-conduction | Not started |
 
 ### Changelog
+- **2a (`261117-2a`)** — Service-worker fix. Symptom: on the phone (GitHub Pages) the new build stamp showed but the new styles didn't appear in the menu (a private tab was fine). Cause (most likely): `cache.addAll()` honours the browser HTTP cache, and GitHub Pages sends `max-age=600`, so a stale `index.js` was stored under the new cache name. Fix: install fetches with `cache: 'reload'`; fetch handler is now network-first (`no-cache` revalidation, 4 s timeout) with the cached copy as the offline fallback. Offline use still works; updates no longer depend on a cache-name bump landing cleanly. No audio/engine changes.
 - **2 (`261117-2`)** — Added **Synthwave** and **Darksynth** (`js/styles/synthwave.js`, `darksynth.js`) and `js/styles/scenes.js`. Engine additions, all within the graph rules (no new per-note nodes; the only new persistent node is one WaveShaper on the Darksynth bass bus):
   - `BUS.synth(ctx, out, keep, role)`: optional `role.drive` puts a soft-clip WaveShaper (tanh, oversample 2x) in front of the role's shared filter. The bus input is then the shaper and the filter hangs off it as `.tone`; `synth()` writes notes to `out` and drives `out.tone || out`.
   - Synth `filter.sweep: [lo, hi]` (Hz): cutoff glides lo→hi→lo across the whole progression (bass events carry `pos` 0–1).
