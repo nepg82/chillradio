@@ -221,11 +221,13 @@ function startManual() {
 function nextRadio(startAt) {
   if (!state.playing) return;
   const t0 = performance.now();
+  // Radio always uses each style's own tempo range and swing: a BPM/swing tweak lasts only for the song it was made in.
+  state.userBpm = null; state.userSwing = null; seq.swing = null; save();
   if (state.allStyles) {
     const pick = STYLES[Math.floor(Math.random() * STYLES.length)];
     if (pick.id !== state.styleId) selectStyle(pick.id);
   }
-  const { song, arranger } = planRadio(style(), state.userBpm);
+  const { song, arranger } = planRadio(style(), null);
   adopt(song);
   seq.start(song, arranger, startAt);
   log(`song setup ${Math.round(performance.now() - t0)} ms, page ${document.visibilityState}`);
