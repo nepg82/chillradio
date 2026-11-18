@@ -59,6 +59,8 @@ export function scaleMidi(key, scale, lo, hi) {
 
 // Voice-leading: of all inversions of `notes` (root position, ascending MIDI) whose lowest note falls in
 // [lo, lo+11], return the one closest to `prev` (the previous voicing, or none -> a middle inversion).
+// Inversions with a half step between neighbours, or a whole step below MIDI 55 (muddy), are skipped
+// whenever a cleaner one exists.
 export function voiceLead(prev, notes, lo) {
   const cands = []; let cur = notes.slice().sort((a, b) => a - b); // 9ths sit above the octave, so keep sorted
   for (let k = 0; k < cur.length; k++) {
@@ -66,7 +68,9 @@ export function voiceLead(prev, notes, lo) {
     cands.push(cur.map(n => n + shift));
     cur = [...cur.slice(1), cur[0] + 12].sort((a, b) => a - b);
   }
-  if (!prev) return cands[Math.min(1, cands.length - 1)];
+  const clean = v => v.every((n, i) => !i || n - v[i - 1] >= (v[i - 1] < 55 ? 3 : 2));
+  const pool = cands.filter(clean).length ? cands.filter(clean) : cands;
+  if (!prev) return pool[Math.min(1, pool.length - 1)];
   const cost = v => v.reduce((a, n) => a + Math.min(...prev.map(p => Math.abs(p - n))), 0);
-  return cands.reduce((b, v) => (cost(v) < cost(b) ? v : b));
+  return pool.reduce((b, v) => (cost(v) < cost(b) ? v : b));
 }

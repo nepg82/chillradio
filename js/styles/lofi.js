@@ -75,7 +75,7 @@ export default {
       ],
     },
     {
-      id: 'keys', label: 'Keys', part: 'comp', kind: 'synth', mix: 0, lo: 50, voiceLead: true, send: { rev: 0.2 },
+      id: 'keys', label: 'Keys', part: 'comp', kind: 'synth', mix: 0, lo: 50, voiceLead: true, rootless: true, send: { rev: 0.2 },
       patterns: [
         bars('7.....3...3...3.', '7.....3...3.....'),
         bars('7.....3...3.....', '7.........3...3.'),
@@ -89,7 +89,7 @@ export default {
       ],
     },
     {
-      id: 'pad', label: 'Pad', part: 'chord', kind: 'synth', mix: 0, lo: 38, voiceLead: true, send: { rev: 0.35 },
+      id: 'pad', label: 'Pad', part: 'chord', kind: 'synth', mix: 0, lo: 38, voiceLead: true, rootless: true, send: { rev: 0.35 },
       voices: [
         { name: 'Warm Tri',  p: { osc: [osc('triangle', 1, -7), osc('triangle', 1, 7)], filter: { freq: 1000, q: 0.3 }, vibrato: wobble, amp: { a: 0.6, d: 0.1, s: 1, r: 1.05 }, gain: 0.0625 } },
         { name: 'Sine Pad',  p: { osc: [osc('sine', 1, -7), osc('sine', 1, 7)],         filter: { freq: 1000, q: 0.3 }, vibrato: wobble, amp: { a: 0.6, d: 0.1, s: 1, r: 1.05 }, gain: 0.08 } },

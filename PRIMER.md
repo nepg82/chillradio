@@ -5,7 +5,7 @@
 > stability problem, and the rules we've set. **Claude: update this file at the end of every step**
 > (changelog, status, build stamp, open issues) and give the user the updated copy.
 
-Last updated: **Step 3a — build `261117-3`, service-worker cache `chill-radio-v0.3.0`**
+Last updated: **Step 3a (fix) — build `261117-3a`, service-worker cache `chill-radio-v0.3.1`**
 
 ---
 
@@ -77,6 +77,7 @@ behind the lock screen** and respond to Bluetooth play/pause/next. Sound should 
 | 4 | Sound & melody pass: layered detune, soft saturation, better reverb; melody generator with motif repetition/variation, rests, chord-tone targeting; maybe a brightness/warmth control for bone-conduction | Not started |
 
 ### Changelog
+- **3a fix (`261117-3a`)** — Dissonant Lofi pads/keys. Cause: my port of the loop machine's chords kept the root (its `Q[q].slice(1)` *drops* it because the bass plays the root), so inversions put the root/octave next to the 7th/9th (half-step clusters like G–G#, B–C) in the low register. Fix: role flag `rootless: true` (lofi `keys` and `pad`), and `voiceLead()` now skips inversions with a half step between neighbours, or a whole step below MIDI 55, whenever a cleaner one exists. Verified over all 12 keys × 6 progressions × 2 registers: 0 clustered voicings (was 221 of 288 in a sample). Synthwave/Darksynth pad notes were checked too: clean spread triads, same as Chillforge. Remaining by-design clash candidates there: the pad's ~0.75 s release tail overlaps the next chord (worst in Darksynth's Phrygian Dread, E minor → F major) and the supersaw's ±14-cent detune beats. Easy to shorten if it bothers (`amp.r` on the pad voices).
 - **3a (`261117-3`)** — **Lofi** style (`js/styles/lofi.js`) and a **Swing slider** (0–50% of a 16th; a value you set sticks across styles until you tap "Use style default"; stored as `userSwing`, applied via `Sequencer.swing`). Engine additions (graph rules respected; the only new persistent node is the optional style tone filter):
   - `voiceLead(prev, notes, lo)` in `music.js` + `voicing()` in `parts.js`: role flag `voiceLead: true` makes `chord` and `comp` roles move to the nearest inversion of each chord (computed once per chord, state in `song.rt[roleId]`). 9th chords sit above the octave, so inversions are re-sorted each rotation (a bug the tests caught).
   - New part **`comp`**: strummed chord stabs. Pattern digits = hit length in steps, `.` = rest. Notes carry `ev.dt` (seconds); the sequencer schedules at `t + dt`.
@@ -189,7 +190,7 @@ export default {
 - **`kind`** (instruments.js → sound): `kick | snare | hat | synth`. Params:
   - kick `{f0,f1,sweep,decay,gain,lp?,click?}` · snare `{noiseFreq,q?,decay,gain,tone?,toneDecay?,toneGain?,clap?}` · hat `{freq,decay,openDecay,gain}`
   - synth `{ osc:[{type,gain,detune,mult}], filter:{type?,freq,q?,env?,decay?}, amp:{a,d,s,r}, vibrato?:{rate,depth}, gain }`
-- **Role fields (Lofi):** `voiceLead: true` (chord/comp roles: nearest-inversion voicing), `maxHold` (bass: cap note length in steps), and `lo` also applies to bass. Part `comp`: pattern digits are hit lengths in steps (`7.....3...3...3.`); the chord is strummed low→high. Events may carry `dt` (seconds offset).
+- **Role fields (Lofi):** `voiceLead: true` (chord/comp roles: nearest-inversion voicing, skipping clustered inversions), `rootless: true` (drop the chord root from the voicing; the bass plays it), `maxHold` (bass: cap note length in steps), and `lo` also applies to bass. Part `comp`: pattern digits are hit lengths in steps (`7.....3...3...3.`); the chord is strummed low→high. Events may carry `dt` (seconds offset).
 - **Style fields:** `fx.tone` (Hz, optional style-wide low-pass). Voice `vibrato.sync: true` = phase-locked shared wobble (see changelog 3a).
 - **Optional role fields:** `accent` (bass/arp: off-beat notes softer), `lo` (chord/arp: lowest root MIDI note), `noteLen` (arp: note length in steps), `drive` (synth: distortion amount in front of the shared filter, e.g. 5). Synth `filter` may also have `sweep: [lo, hi]`. Snare params may have `gate` (seconds).
 - **Pattern characters:** drum `x g o . ? ,` (`?` = 35% strong hit, `,` = 60% ghost); bass `r 5 o .`; arp digits (index into chord tones, wrapping up an octave), `.`, or `~wander` / `~scatter` (+ step-interval digit) for random walks.

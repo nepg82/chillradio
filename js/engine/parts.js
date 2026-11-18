@@ -13,9 +13,10 @@ const hold = (pat, s) => {
 };
 
 // Voice-led voicing for a role (role.voiceLead): computed once per chord, then reused for the whole phrase.
+// role.rootless drops the root (the bass plays it), as jazz/lofi comping does.
 function voicing(song, role, chord, ci, s) {
   const st = (song.rt[role.id] ||= {});
-  if (st.ci !== ci || s < st.s) { st.notes = voiceLead(st.notes, chordMidi(song.key, chord, 0), role.lo ?? 50); st.ci = ci; }
+  if (st.ci !== ci || s < st.s) { st.notes = voiceLead(st.notes, chordMidi(song.key, chord, 0).slice(role.rootless ? 1 : 0), role.lo ?? 50); st.ci = ci; }
   st.s = s;
   return st.notes;
 }
