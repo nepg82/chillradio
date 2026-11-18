@@ -69,9 +69,14 @@ function snare(ctx, out, t, ev, p) {
   const bursts = p.clap ? [0, 0.011, 0.022] : [0];
   bursts.forEach((off, i) => {
     const last = i === bursts.length - 1;
-    const d = last ? p.decay : 0.012;
+    const d = last ? (p.gate || p.decay) : 0.012;
     const n = noiseSrc(ctx, t + off, d + 0.05), g = ctx.createGain();
-    decayEnv(g, t + off, ev.vel * p.gain, d);
+    if (p.gate && last) { // gated: held level, then cut sharply (the reverb send supplies the tail)
+      const pk = ev.vel * p.gain;
+      g.gain.setValueAtTime(pk, t + off);
+      g.gain.linearRampToValueAtTime(pk * 0.69, t + off + d * 0.84);
+      g.gain.linearRampToValueAtTime(0.0001, t + off + d);
+    } else decayEnv(g, t + off, ev.vel * p.gain, d);
     n.connect(g).connect(sharedFilter(ctx, out, 'bandpass', p.noiseFreq, p.q || 0.8));
     });
   if (p.tone) {
@@ -107,7 +112,8 @@ function vibratoCurve(base, v, dur) {
   return c;
 }
 
-function synth(ctx, tone, t, ev, p) {
+function synth(ctx, out, t, ev, p) {
+  const tone = out.tone || out; // `out` is the bus input; its shared filter (if the bus has a shaper in front) is out.tone
   const { a = 0.01, d = 0.2, s = 0.6, r = 0.2 } = p.amp || {};
   const dur = Math.max(ev.dur, a + 0.02);
   const end = t + dur, stopAt = end + r * 2;
@@ -115,7 +121,9 @@ function synth(ctx, tone, t, ev, p) {
 
   if (tone.lastT !== t) { // chord notes share one strike time, so the filter is set once per strike
     tone.lastT = t;
-    const fp = p.filter || {}, base = fp.freq || 4000, type = fp.type || 'lowpass';
+    const fp = p.filter || {}, type = fp.type || 'lowpass';
+    // fp.sweep = [lo, hi] Hz: the cutoff glides lo -> hi -> lo across the progression (ev.pos is 0..1)
+    const base = fp.sweep && ev.pos != null ? fp.sweep[0] * (fp.sweep[1] / fp.sweep[0]) ** (1 - Math.abs(2 * ev.pos - 1)) : fp.freq || 4000;
     if (tone.type !== type) tone.type = type;
     tone.Q.setValueAtTime(fp.q || 0.7, t);
     tone.frequency.setValueAtTime(base + (fp.env || 0), t);
@@ -131,7 +139,7 @@ function synth(ctx, tone, t, ev, p) {
     g.gain.linearRampToValueAtTime(pk, t + a);
     g.gain.setTargetAtTime(pk * s, t + a, d / 3);
     g.gain.setTargetAtTime(0, end, r / 3);
-    o.connect(g).connect(tone);
+    o.connect(g).connect(out);
     o.start(t); o.stop(stopAt);
   }
 }
@@ -143,11 +151,21 @@ export const KINDS = { kick, snare, hat, synth };
 // Buses: a kind that needs processing shared by all its notes declares it here. setStyle() calls
 // BUS[kind](ctx, out, keep) once per role and passes the returned node to the kind as its `out`.
 // Kinds without an entry just receive the role's gain node.
+// Soft-clip curve for `drive` (cached per amount; output kept near the clean level).
+const driveCache = {};
+const driveCurve = k => driveCache[k] ||= Float32Array.from({ length: 2048 }, (_, i) => Math.tanh(k * ((i / 2047) * 2 - 1)) * 0.35);
+
 export const BUS = {
-  synth(ctx, out, keep) {
+  // role.drive (optional): distortion in front of the shared filter (distort first, then filter).
+  synth(ctx, out, keep, role = {}) {
     const f = keep(ctx.createBiquadFilter());
     f.type = 'lowpass'; f.frequency.value = 4000; f.Q.value = 0.7;
     f.connect(out);
-    return f;
+    if (!role.drive) return f;
+    const sh = keep(ctx.createWaveShaper());
+    sh.curve = driveCurve(role.drive); sh.oversample = '2x';
+    sh.connect(f);
+    sh.tone = f;
+    return sh;
   },
 };

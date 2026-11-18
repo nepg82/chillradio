@@ -5,7 +5,7 @@
 > stability problem, and the rules we've set. **Claude: update this file at the end of every step**
 > (changelog, status, build stamp, open issues) and give the user the updated copy.
 
-Last updated: **Step 1a — build `261116-1a`, service-worker cache `chill-radio-v0.1.1`**
+Last updated: **Step 2 — build `261117-2`, service-worker cache `chill-radio-v0.2.0`**
 
 ---
 
@@ -29,7 +29,7 @@ Last updated: **Step 1a — build `261116-1a`, service-worker cache `chill-radio
 | Task | Files to attach |
 |---|---|
 | Anything / general | `PRIMER.md` (+ `index.html`, `js/app.js` if UI-related) |
-| New style ("make me a Synthwave") | `PRIMER.md`, `js/styles/chillwave.js` (the template), `js/engine/parts.js`, `js/engine/instruments.js`, `js/engine/radio.js`, `js/styles/index.js` |
+| New style ("make me a Vaporwave") | `PRIMER.md`, the closest existing style file (e.g. `js/styles/synthwave.js`; `chillwave.js` if it needs a melody), `js/styles/scenes.js`, `js/engine/parts.js`, `js/engine/instruments.js`, `js/engine/radio.js`, `js/styles/index.js`. Remember to add the new file to `ASSETS` in `sw.js` |
 | Stability / glitch investigation | `PRIMER.md`, `js/engine/audio.js`, `js/engine/instruments.js`, `js/engine/sequencer.js`, `js/app.js`, `js/mediasession.js`, **plus the log text** from the phone |
 | UI / look | `PRIMER.md`, `index.html`, `css/style.css`, `js/app.js` |
 | Not sure | Zip the whole folder (it's small, ~100 KB without icons) |
@@ -69,12 +69,19 @@ behind the lock screen** and respond to Bluetooth play/pause/next. Sound should 
 | Step | Content | Status |
 |---|---|---|
 | 1 | Scaffold Chill Radio from Synth Radio; scheduler `try/catch`; hidden lookahead 1.5 s; drop forced 32 kHz; stereo reverb + toggle; diagnostics; new palette; rename | **Done** (built, laptop-tested) |
-| 1a | **Stability rework** of the voice engine (see §5) after the phone glitched; richer diagnostics; this primer | **Done — awaiting overnight phone test** |
-| 2 | Port **Synthwave** and **Darksynth** from Chillforge into style files; needs engine additions (bass drive/waveshaper, supersaw, arp patterns, scenes) — as new `KINDS`/`PARTS`/`BUS` entries, following the graph rules | Not started. **Hold until the 1a phone result is known**, or proceed if user prefers |
+| 1a | **Stability rework** of the voice engine (see §5) after the phone glitched; richer diagnostics; this primer | **Done.** User reported several hours on the phone behind the lock screen with no glitches (previously it failed). Promising, not yet proven by a full overnight run — keep checking logs |
+| 2 | Port **Synthwave** and **Darksynth** from Chillforge into style files, with the engine additions they need (bass drive, filter sweep, arp random walks, scenes), following the graph rules | **Done — awaiting listening/phone test** |
 | 3 | **Lofi** style from the loop machine; Swing as a real slider (now a fixed per-style constant); **Auto-cycle** for Manual mode; generalize the **visualizer** to any style's roles | Not started |
 | 4 | Sound & melody pass: layered detune, soft saturation, better reverb; melody generator with motif repetition/variation, rests, chord-tone targeting; maybe a brightness/warmth control for bone-conduction | Not started |
 
 ### Changelog
+- **2 (`261117-2`)** — Added **Synthwave** and **Darksynth** (`js/styles/synthwave.js`, `darksynth.js`) and `js/styles/scenes.js`. Engine additions, all within the graph rules (no new per-note nodes; the only new persistent node is one WaveShaper on the Darksynth bass bus):
+  - `BUS.synth(ctx, out, keep, role)`: optional `role.drive` puts a soft-clip WaveShaper (tanh, oversample 2x) in front of the role's shared filter. The bus input is then the shaper and the filter hangs off it as `.tone`; `synth()` writes notes to `out` and drives `out.tone || out`.
+  - Synth `filter.sweep: [lo, hi]` (Hz): cutoff glides lo→hi→lo across the whole progression (bass events carry `pos` 0–1).
+  - Parts: drum pattern chars `?` (35% chance, strong hit) and `,` (60% chance, ghost); bass `role.accent` (off-beat notes softer) and `pos`; chord/arp `role.lo` (lowest root); arp `role.noteLen` (steps) and `role.accent`; arp patterns `~wander`/`~scatter` (+ optional step interval digit, e.g. `~wander2`) random walks over two octaves of chord tones, with per-song state in `song.rt`.
+  - Instruments: snare `gate` (seconds): held level then sharp cut (gated snare).
+  - Theory: chord types `minS`/`majS` (spread triads: root, 5th, octave, 3rd — Chillforge's voicings).
+  - `scenes(table, chance)` radio `decorate` helper: Chillforge's auto-mute scenes (weighted role sets muted for 1–2 phrases, decided once per progression pass, never the first/last main phrase, never the pass right after a scene). Synthwave/Darksynth use `dropout: 0` + scenes at 25% per pass (Chillforge's default "Occasional" was 15%; tune freely).
 - **1a (`261116-1a`)** — Voice engine rewrite: per-note `BiquadFilterNode` and per-note vibrato LFO removed. Synth roles now have one **shared tone filter** (built once, `BUS.synth`) driven once per strike; vibrato is a `setValueCurveAtTime` pitch curve per oscillator; each oscillator has its own envelope gain. Per-song gain stages are no longer recreated per song: they're **persistent per-role gains** that are faded for "Next song" and reset by `newSong(at)`. Note: filter envelope is now shared across simultaneous/overlapping notes of a role (fine for chords, slightly different for overlapping bass/lead releases). New diagnostics (see §7). Release time ×2 instead of ×1.5 (smaller stop pop).
 - **1 (`261116-1`)** — Scaffold, scheduler fault isolation (a throwing note is logged and skipped, clock always advances), hidden lookahead 1.5 s, removed forced `sampleRate: 32000`, reverb re-enabled (stereo IR) behind a checkbox, liveness/heartbeat/freeze/error logging, tap-build-stamp-to-copy-log, cyan/purple/yellow palette, storage keys renamed `chillradio-*`.
 
@@ -98,7 +105,10 @@ js/engine/song.js    makeSong(): all random choices fixed for one song (key, bpm
 js/engine/radio.js   planRadio(): song + arranger (intro/main/outro, role groups entering/dropping out)
 js/engine/music.js   theory helpers (chord types, scales, mtof, tools(rnd))
 js/styles/index.js   registry of styles (STYLES array)
-js/styles/chillwave.js  the Chillwave style (the template for new styles)
+js/styles/chillwave.js  Chillwave (the template for new styles; melodic, uses motifs + dropout)
+js/styles/synthwave.js  Synthwave (arp + bass + supersaw pad; uses scenes)
+js/styles/darksynth.js  Darksynth (adds bass drive + sweep, gated snare, eighth-note arp)
+js/styles/scenes.js     radio.decorate helper: Chillforge-style auto-mute scenes
 ```
 
 **Signal flow:** note → (`KINDS` function creates oscillators/noise) → role bus (`outs[role]`: shared tone filter for
@@ -169,6 +179,9 @@ export default {
 - **`kind`** (instruments.js → sound): `kick | snare | hat | synth`. Params:
   - kick `{f0,f1,sweep,decay,gain,lp?,click?}` · snare `{noiseFreq,q?,decay,gain,tone?,toneDecay?,toneGain?,clap?}` · hat `{freq,decay,openDecay,gain}`
   - synth `{ osc:[{type,gain,detune,mult}], filter:{type?,freq,q?,env?,decay?}, amp:{a,d,s,r}, vibrato?:{rate,depth}, gain }`
+- **Optional role fields:** `accent` (bass/arp: off-beat notes softer), `lo` (chord/arp: lowest root MIDI note), `noteLen` (arp: note length in steps), `drive` (synth: distortion amount in front of the shared filter, e.g. 5). Synth `filter` may also have `sweep: [lo, hi]`. Snare params may have `gate` (seconds).
+- **Pattern characters:** drum `x g o . ? ,` (`?` = 35% strong hit, `,` = 60% ghost); bass `r 5 o .`; arp digits (index into chord tones, wrapping up an octave), `.`, or `~wander` / `~scatter` (+ step-interval digit) for random walks.
+- **Chord types** also include `minS`/`majS` (spread triads). Transposable relative progressions only: Chillforge's progressions that differed only by key were merged (see §8).
 - **New behaviour** = add a function to `PARTS` (note generation) or `KINDS` (+ `BUS` if it needs shared processing) and reference it from the style. Keep the graph rules (§5).
 - Radio mode: `radio.groups` enter together in the intro and leave in the outro; one `openers` group starts; `dropout` is the chance a main phrase mutes 1–2 groups; `decorate` can add builds/drops.
 
@@ -195,6 +208,9 @@ export default {
 - Base architecture decision (session 1): build on **Synth Radio's modular structure**, port Chillforge's stability discipline and styles; Pulseforge dropped.
 - App name: **Chill Radio** (alternatives floated: Nightshift Radio, Lowlight FM, Hush FM).
 - Has the user ever left Chillforge's *Dubstep 2* running for hours? (It uses per-hit filters — a useful data point for the theory.)
+- Step 2 port notes: Chillforge's four Synthwave progressions had the same shape in different keys, so Chill Radio has the two distinct ones (Neon Drive, Andalusian Night) plus two new ones (Sunset Strip, Midnight Run). Darksynth's four were all distinct and are ported. Kick/snare/hat are separate mixer roles (Chillforge had one Drums channel). Chillforge's per-style master low-pass (`cutoffMul`) isn't replicated; the cutoffs are baked into voice filters (pad 2600/1500 Hz, arp 4500/3750 Hz). Chillforge's `softtri` waveform isn't ported (voices use triangle). Chillforge's manual pulldowns (pad shape, arp pattern, lead shape, bassline, variation) are now random per-song picks among `patterns`/`voices`; voices can be swapped live in the UI. **Dubstep 2 was not ported.**
+- Synthwave additions beyond Chillforge: four-on-the-floor kick pattern and octave-bounce bass pattern as variety.
+- Likely first things to tune by ear (levels are approximations of Chillforge's, since Chill Radio's mixer is per role and its hat/snare kinds are slightly different): hat levels and open/closed balance, snare tone, bass vs kick balance, pad/arp reverb sends, scene frequency.
 - Voice tuning pass planned after all steps (user will tune voicing options).
 - Visualizer for Step 3 must be generic over a style's roles (the loop machine's is a fixed 3-row drum grid + chord bar, synced to the audio clock with output-latency compensation).
 

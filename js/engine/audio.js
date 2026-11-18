@@ -107,7 +107,7 @@ export class AudioEngine {
       const sg = keep(ctx.createGain());
       sg.connect(input);
       this.songGains[role.id] = sg;
-      this.outs[role.id] = BUS[role.kind] ? BUS[role.kind](ctx, sg, keep) : sg;
+      this.outs[role.id] = BUS[role.kind] ? BUS[role.kind](ctx, sg, keep, role) : sg;
     }
     this.styleId = style.id;
   }

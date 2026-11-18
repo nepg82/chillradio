@@ -15,6 +15,7 @@ export const CHORD_TYPES = {
   sus2: [0, 2, 7],        sus4: [0, 5, 7],
   maj7: [0, 4, 7, 11],    min7: [0, 3, 7, 10],   dom7: [0, 4, 7, 10],
   add9: [0, 4, 7, 14],    maj9: [0, 4, 7, 11, 14], min9: [0, 3, 7, 10, 14],
+  minS: [0, 7, 12, 15],  majS: [0, 7, 12, 16],   // spread triads: root, 5th, octave, 3rd
 };
 
 export const KEY_NAMES = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];

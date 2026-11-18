@@ -19,7 +19,7 @@ export function makeSong(style, o = {}, rnd = Math.random) {
     }
   }
   const title = o.keep?.title || `${R.pick(style.names.adj)} ${R.pick(style.names.noun)}`;
-  return { style, key, bpm, progression, voices, patterns, motifs, title };
+  return { style, key, bpm, progression, voices, patterns, motifs, title, rt: {} };
 }
 
 // One 2-bar motif: {step: {midi, len}}. Starts on a chord tone, then mostly steps.
