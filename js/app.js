@@ -44,12 +44,13 @@ function log(msg) {
 
 // Liveness record: if the page is killed mid-play, the next boot says so in the log.
 const ALIVE_KEY = 'chillradio-alive';
-const alive = why => { try { localStorage.setItem(ALIVE_KEY, JSON.stringify({ t: Date.now(), p: state.playing, w: why })); } catch {} };
+const alive = why => { try { localStorage.setItem(ALIVE_KEY, JSON.stringify({ t: Date.now(), p: state.playing && !state.paused, w: why })); } catch {} };
 try {
   const pv = JSON.parse(localStorage.getItem(ALIVE_KEY) || 'null');
   if (pv && pv.p) log(`PREV SESSION ENDED WHILE PLAYING. last alive ${new Date(pv.t).toLocaleString('sv-SE').slice(5)} (${pv.w}) discarded=${document.wasDiscarded}`);
 } catch {}
 alive('boot');
+log(`boot, build ${$('#ver').textContent}`);
 
 // Per-session song counter, stored separately so the capped log can't push it out.
 const STATS_KEY = 'chillradio-stats';
@@ -85,8 +86,8 @@ const seq = new Sequencer(engine, {
     if (n - lastBeat > 120000) { // heartbeat every 2 min
       lastBeat = n;
       const c = engine.ctx, mem = performance.memory ? ` mem=${Math.round(performance.memory.usedJSHeapSize / 1048576)}MB` : '';
-      const lag = c ? Math.round((performance.now() - clk.p) - (c.currentTime - clk.c) * 1000) : 0;
-      log(`hb ctx=${c ? c.state : '-'} ct=${c ? Math.round(c.currentTime) : 0} vis=${document.visibilityState} lag=${lag}ms notes=${engine.notes}/${engine.songNotes}${playout()}${mem}`);
+      const lag = c && c.state === 'running' ? Math.round((performance.now() - clk.p) - (c.currentTime - clk.c) * 1000) + 'ms' : 'n/a';
+      log(`hb ctx=${c ? c.state : '-'} ct=${c ? Math.round(c.currentTime) : 0} vis=${document.visibilityState} lag=${lag} notes=${engine.notes}/${engine.songNotes}${playout()}${mem}`);
     }
   },
 });
@@ -111,7 +112,7 @@ const session = initMediaSession({
 async function play() {
   stats = { start: Date.now(), songs: 0, last: 0, ended: null };
   saveStats();
-  log('session start');
+  log(`session start, build ${$('#ver').textContent}`);
   alive('play');
   engine.reverbOn = state.reverb;
   state.yielded = false; clearTimeout(yieldTimer);
@@ -153,7 +154,7 @@ function stop() {
 // Lock screen / Bluetooth pause: freeze the audio clock so resume continues mid-phrase.
 function pause() {
   if (!state.playing || state.paused || !engine.ctx) return;
-  state.paused = true;
+  state.paused = true; alive('pause');
   clearTimeout(yieldTimer); state.yielded = false;
   engine.ctx.suspend();
   session.pause();
@@ -162,7 +163,7 @@ function pause() {
 
 async function resume() {
   if (!state.paused || !engine.ctx) return;
-  state.paused = false;
+  state.paused = false; alive('resume');
   engine.setMuted(false);
   session.start();
   await engine.ctx.resume();

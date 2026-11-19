@@ -5,7 +5,7 @@
 > stability problem, and the rules we've set. **Claude: update this file at the end of every step**
 > (changelog, status, build stamp, open issues) and give the user the updated copy.
 
-Last updated: **Step 3a (Radio tempo/swing) — build `261118-3c`, service-worker cache `chill-radio-v0.3.3`**
+Last updated: **Step 3a (log fixes) — build `261119-3d`, service-worker cache `chill-radio-v0.3.4`**
 
 ---
 
@@ -40,7 +40,7 @@ Last updated: **Step 3a (Radio tempo/swing) — build `261118-3c`, service-worke
 > are, then we'll continue with: *(next step / problem)*.
 
 ### Housekeeping
-- Every code change: Claude bumps the build stamp (`index.html`, `#ver`) and the service-worker cache name (`sw.js`).
+- **Build stamps:** the user's standard is `YYMMDD-HHMM` (deploy time), which they set by hand in `index.html` (`#ver`) when they deploy. Stamps Claude writes (e.g. `261119-3d`) are placeholders/step labels to be overwritten, so a stamp in a log or screenshot is the user's deploy time, not necessarily Claude's label. Since 3d the stamp is logged at boot and at every session start, so logs can be matched to builds. Claude still bumps the service-worker cache name (`sw.js`) on every change.
 - App icons live at `app-icons/app-icon-192.png` and `app-icon-512.png` (the CSS background and manifest depend on those exact paths). The current icons are **placeholders**; replace with your own anytime.
 - Palette: cyan `#7ef7fc` (primary actions/focus), purple `#fb18f9` (active mode/section), yellow `#fddd0c` (build stamp, tempo). Dark purple-black background.
 
@@ -77,6 +77,7 @@ behind the lock screen** and respond to Bluetooth play/pause/next. Sound should 
 | 4 | Sound & melody pass: layered detune, soft saturation, better reverb; melody generator with motif repetition/variation, rests, chord-tone targeting; maybe a brightness/warmth control for bone-conduction | Not started |
 
 ### Changelog
+- **3d (`261119-3d`)** — Log-only fixes, found by reading a ~36 h phone log (see §5 status). (1) A paused app was recorded as "playing", so a pause followed by the page being closed logged a false `PREV SESSION ENDED WHILE PLAYING`; the liveness record is now `playing && !paused` and is written on pause/resume. (2) Heartbeats during a pause (or any non-running context) printed a huge meaningless `lag`; now `lag=n/a` unless the context is running. (3) The build stamp is now logged at boot and at each `session start`, so a log can be matched to a build. No audio/engine changes.
 - **3c (`261118-3c`)** — Radio mode now always uses each style's own BPM range and swing. A BPM/swing tweak made in Radio lasts only for the song it was made in: `nextRadio()` clears `userBpm`/`userSwing` (and `seq.swing`) at the start of every song and plans with `planRadio(style, null)`. Before this, a touched BPM stayed pinned across songs and styles (clamped into each style's range) until site data was cleared, and a touched swing overrode every style. Manual mode is unchanged (a tweak there sticks until reset). No audio/engine changes. Untested in a browser (syntax-checked only).
 - **3b-mix (`261117-3b`)** — Muddy Lofi pad. Measured cause: the pad's lowest note was MIDI 38, so 87% of its notes sat below 200 Hz and its lowest note averaged only ~2 semitones above the bass root (bass is MIDI 36–47), with keys stacked in the same octave. Fix (Lofi only): pad `lo` 38→50 and keys `lo` 50→57 (pad now averages ~206 Hz lowest note, ~14 semitones above the bass; close note pairs below 233 Hz per chord dropped from 2.9 to 0.9); pad `amp.r` 1.05→0.7 (shorter overlap with the next chord); new optional `fx.reverb.hp` (Hz) = a persistent high-pass in front of the convolver (Lofi: 250). No change to other styles.
 - **3a fix (`261117-3a`)** — Dissonant Lofi pads/keys. Cause: my port of the loop machine's chords kept the root (its `Q[q].slice(1)` *drops* it because the bass plays the root), so inversions put the root/octave next to the 7th/9th (half-step clusters like G–G#, B–C) in the low register. Fix: role flag `rootless: true` (lofi `keys` and `pad`), and `voiceLead()` now skips inversions with a half step between neighbours, or a whole step below MIDI 55, whenever a cleaner one exists. Verified over all 12 keys × 6 progressions × 2 registers: 0 clustered voicings (was 221 of 288 in a sample). Synthwave/Darksynth pad notes were checked too: clean spread triads, same as Chillforge. Remaining by-design clash candidates there: the pad's ~0.75 s release tail overlaps the next chord (worst in Darksynth's Phrygian Dread, E minor → F major) and the supersaw's ±14-cent detune beats. Easy to shorten if it bothers (`amp.r` on the pad voices).
@@ -152,6 +153,8 @@ once on shared buses (its Dubstep 2 style is the exception and has not been run 
 hanging off a long-lived node may accumulate on the audio thread. The on-and-off silence during sparse intros is the part this
 explains least.
 
+**Phone log evidence (11-17 to 11-19, ~36 h):** the Step 1a build ran a Lofi-only Radio session ~7.5 h overnight behind the lock screen (123 songs): context `running` throughout, memory flat at 2–5 MB, clock `lag` bounded (about −65..+180 ms, no trend), notes/song steady, zero `ERR`/`RESYNC` lines. A mixed-style (all-styles) run reached ~2 h 46 m cleanly; a longer all-styles run was still pending. Brave exposes no underrun counters (`po=n/a`). A recurring audio-focus grab every 10 minutes (an alarm/notification on the phone) was handled correctly. Known log quirk: after a resume, `lag` can sit at a constant ±300 ms offset (the baseline is taken as the clock restarts) — an artifact, not a stall.
+
 **Step 1a** removed those patterns. **The overnight phone test of 1a decides what's next:**
 - Survives → theory confirmed; continue with Step 2, keeping the graph rules below.
 - Fails → next suspects: the shared feedback delay loop / denormals in quiet passages, compressor state, persistent per-role gains, sparse-intro behavior (try playing with Reverb off, or inspect `lag=` / `fb=` in the log; consider voice pooling or a Chillforge-style full rebuild per song).
@@ -206,10 +209,10 @@ export default {
 
 | Line | Meaning |
 |---|---|
-| `session start/stopped: N songs in Xh Ym` | Session boundaries |
+| `boot, build …` / `session start, build …` / `session stopped: N songs in Xh Ym` | Session boundaries; the build stamp is logged so a log can be matched to a build |
 | `PREV SESSION ENDED WHILE PLAYING … discarded=…` | At boot: the page was killed while playing (browser/OS killed it) |
 | `song #N "Title" BPM (prev song notes=K)` | New song; K = notes scheduled in the previous song (look for the count at which glitches begin) |
-| `hb ctx=… ct=… vis=… lag=…ms notes=total/song fb=…/…ms lat=…ms mem=…` | Heartbeat every 2 min. **`lag`** = audio clock vs wall clock (ms; grows if the audio thread stalls). **`notes`** = notes scheduled this session / this song. **`fb=events/ms`** = browser underrun ("fallback frames") counters if Brave exposes `playoutStats` (`po=n/a` if not). `ctx=` should be `running` |
+| `hb ctx=… ct=… vis=… lag=…ms|n/a notes=total/song fb=…/…ms lat=…ms mem=…` | Heartbeat every 2 min. **`lag`** = audio clock vs wall clock (ms; grows if the audio thread stalls). **`notes`** = notes scheduled this session / this song. **`fb=events/ms`** = browser underrun ("fallback frames") counters if Brave exposes `playoutStats` (`po=n/a` if not). `ctx=` should be `running` |
 | `ctx suspended/running/interrupted` | AudioContext state changes |
 | `RESYNC N ms behind at phrase P` | Scheduler woke up late and skipped ahead |
 | `ERR step N: …` | A note threw and was skipped (throttled to 1 per 5 s) |
