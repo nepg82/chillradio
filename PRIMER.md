@@ -9,6 +9,15 @@ Last updated: **Step 3a (log fixes) — build `261119-3d`, service-worker cache 
 
 ---
 
+## 0. Status (as of 2026-11-19)
+- **Stability: settled.** The user has run the app flawlessly on the phone for days, including a 7.5 h overnight Lofi run, many hours of all-styles Radio, and a full workday (see §5). The audio-graph rules in §5 are the reason; keep following them for every new style.
+- **Logging: leave it alone.** The user has decided the current log is enough and does not want more detail. Don't propose log enhancements.
+- **Sound tweaks** are done by the user via the in-app level controls; no further mix passes requested.
+- **Next direction (user's):** more styles. Claude's proposed order and the engine gaps for each: **House** (parts exist; new piece = a "pump": scheduled volume dips on one persistent gain node at kick times) → **Trap** (808 bass with per-note pitch glide + long tail; hat rolls via sub-step `ev.dt` timing, already supported; half-time snare is just a pattern) → **Dubstep** (wobble bass via scheduled cutoff curves on the one shared bass filter, not per-note LFOs; most tuning). Chillforge's **Dubstep 2 creates filters per drum hit** (the pattern behind the earlier instability), so rebuild that rather than port it verbatim. Each new style: write it as a style file, add any new kinds/parts within the graph rules, add to `ASSETS` in `sw.js`, run the fake-AudioContext tests (filter/biquad count must stay constant while notes grow), then the user tunes gains by ear.
+- Auto-cycle (old 3b) and the sound/melody pass (old Step 4) are **optional/deferred**: not requested, user is happy with the sound.
+
+---
+
 ## 1. For the human: how to use this project
 
 ### Run locally (layout / sound check on the laptop)
