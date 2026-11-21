@@ -3,7 +3,7 @@
 // - install: fetches every file with cache:'reload' so the browser's HTTP cache (GitHub Pages allows
 //   10 min) can never hand it a stale file to store.
 // - fetch: network first (revalidated, 4 s timeout), falling back to the stored copy when offline.
-const CACHE = 'chill-radio-v0.4.1';
+const CACHE = 'chill-radio-v0.4.2';
 const ASSETS = [
   './', './index.html', './manifest.json', './css/style.css',
   './js/app.js', './js/mediasession.js',
