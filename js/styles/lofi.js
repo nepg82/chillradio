@@ -100,8 +100,8 @@ export default {
     {
       id: 'lead', label: 'Lead', part: 'melody', kind: 'synth', mix: -4, send: { rev: 0.4, dly: 0.3 },
       range: [64, 81],
+      rhythm: { notes: [1, 3], fine: 0.15, rest: 0.5, hook: 0.2 }, // generated rhythms (see song.js makeRhythm); `rhythms` are occasional hand-written hooks
       rhythms: [
-        [[0, 4], [6, 2], [8, 6], [16, 4], [22, 2], [24, 8]],
         [[0, 6], [8, 4], [12, 4], [16, 8], [28, 4]],
         [[2, 4], [8, 2], [10, 6], [18, 4], [24, 6]],
       ],

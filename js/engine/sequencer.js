@@ -40,7 +40,8 @@ export class Sequencer {
   }, TICK_MS); }
   close() { this.stop(); this.closeTicker?.(); this.closeTicker = null; }
 
-  // arranger(phraseIndex) → { chord, active:Set<roleId>, section } | null (song over)
+  // arranger(phraseIndex) → { chord, active:Set<roleId>, section, pat?:{roleId: patternString} } | null (song over)
+  // `pat` (optional) overrides a role's pattern for that phrase (used by sectioned styles such as Complextro).
   // startAt (audio-clock seconds) lets a new song begin exactly when the gap ends.
   start(song, arranger, startAt) {
     this.open();
@@ -122,7 +123,7 @@ export class Sequencer {
     const chord = song.progression.chords[ci];
     for (const role of song.style.roles) {
       if (!phrase.active.has(role.id)) continue;
-      const events = PARTS[role.part]({ song, role, pat: song.patterns[role.id], s, chord, ci, stepDur });
+      const events = PARTS[role.part]({ song, role, pat: phrase.pat?.[role.id] ?? song.patterns[role.id], s, chord, ci, stepDur });
       for (const ev of events) this.engine.play(role, t + (ev.dt || 0), ev, song.voices[role.id]);
     }
   }
