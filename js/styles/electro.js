@@ -1,4 +1,4 @@
-// complextro.js — heavy electro house / brostep-flavoured. See PRIMER.md for the style schema.
+// electro.js — heavy electro house / brostep-flavoured. See PRIMER.md for the style schema.
 // One low bass hit (an eighth note) on beat 1, then staccato sixteenth saws on the chord root for the rest
 // of the bar. Kick on 1 and 3, clap on 2 and 4, eighth-note hats, overdriven melodic lead, saw pads.
 //
@@ -21,8 +21,8 @@ const FORM = [ // n = phrases of 2 bars
 const CYCLE = FORM.reduce((a, f) => a + f.n, 0); // 14 phrases = 28 bars
 
 export default {
-  id: 'complextro',
-  name: 'Complextro',
+  id: 'electro',
+  name: 'Electro',
   bpm: { min: 120, max: 140, def: 128 },
   swing: 0,
 

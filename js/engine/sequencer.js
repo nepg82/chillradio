@@ -41,7 +41,7 @@ export class Sequencer {
   close() { this.stop(); this.closeTicker?.(); this.closeTicker = null; }
 
   // arranger(phraseIndex) → { chord, active:Set<roleId>, section, pat?:{roleId: patternString} } | null (song over)
-  // `pat` (optional) overrides a role's pattern for that phrase (used by sectioned styles such as Complextro).
+  // `pat` (optional) overrides a role's pattern for that phrase (used by sectioned styles such as Electro).
   // startAt (audio-clock seconds) lets a new song begin exactly when the gap ends.
   start(song, arranger, startAt) {
     this.open();
