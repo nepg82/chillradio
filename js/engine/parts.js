@@ -3,7 +3,7 @@
 // To add a new behaviour (e.g. a wobble bass), add a function here.
 // Every part receives a context object c = { song, role, pat, s, chord, ci, stepDur }
 //   s = step within the 2-bar phrase (0–31), ci = chord index in the progression.
-import { chordMidi, mtof, fold, voiceLead } from './music.js';
+import { CHORD_TYPES, chordMidi, mtof, fold, voiceLead } from './music.js';
 
 // Steps from s until the next non-rest character (cyclic).
 const hold = (pat, s) => {
@@ -31,10 +31,10 @@ export const PARTS = {
     return [{ vel, open: ch === 'o' }];
   },
 
-  // r = root, 5 = fifth, o = octave up, . = rest. Notes hold until the next hit.
+  // r = root, b = the chord's third, f = fourth, 5 = fifth, j = minor seventh, o = octave up, . = rest. Notes hold until the next hit.
   // role.accent: off-beat notes are softer. Events carry `pos` (0-1 through the progression) for filter sweeps.
   bass({ song, role, pat, s, chord, ci, stepDur }) {
-    const off = { r: 0, 5: 7, o: 12 }[pat[s % pat.length]];
+    const ch = pat[s % pat.length], off = ch === 'b' ? CHORD_TYPES[chord.t][1] : { r: 0, f: 5, 5: 7, j: 10, o: 12 }[ch];
     if (off === undefined) return [];
     const root = fold(song.key + chord.r, role.lo ?? 28);
     return [{ freq: mtof(root + off), dur: Math.min(hold(pat, s), role.maxHold ?? 99) * stepDur * 0.92, vel: role.accent && s % 4 ? 0.76 : 1,
@@ -85,12 +85,36 @@ export const PARTS = {
   comp({ song, role, pat, s, chord, ci, stepDur }) {
     const d = +pat[s % pat.length];
     if (!d) return [];
-    return voicing(song, role, chord, ci, s).map((m, n) => ({ freq: mtof(m), dur: d * stepDur, vel: 0.8, dt: n * 0.014 + Math.random() * 0.008 }));
+    const k = role.strum ?? 0.014; // seconds between strummed notes (role.strum: 0.003 = tight stab)
+    return voicing(song, role, chord, ci, s).map((m, n) => ({ freq: mtof(m), dur: d * stepDur, vel: 0.8, dt: n * k + Math.random() * k * 0.57 }));
   },
 
   // Pre-generated motif per chord (see song.js).
   melody({ song, role, ci, s, stepDur }) {
     const n = song.motifs[role.id][ci][s];
     return n ? [{ freq: mtof(n.midi), dur: n.len * stepDur * 0.95, vel: 0.9 }] : [];
+  },
+
+  // Wobble bass (kind 'wobble'): the bass part's notes plus one control event at the start of every bar that
+  // tells the kind which cutoff curve to schedule. role.rates = candidate wobble speeds in cycles per beat
+  // (1 = quarter notes, 2 = eighths, 3 = triplets, 4 = sixteenths; 0 = hold open), one picked per bar.
+  wobble(c) {
+    const evs = PARTS.bass(c);
+    if (c.s % 16) return evs;
+    const rates = c.role.rates ?? [1, 2, 2, 3, 4];
+    evs.unshift({ ctl: true, rate: rates[Math.floor(Math.random() * rates.length)], dur: 16 * c.stepDur });
+    return evs;
+  },
+
+  // Stutter / glitch hits. Pattern digit 1–4 = that many equal repeats inside the step (1 = one 16th,
+  // 2 = two 32nds, …), . = rest. Pitch is the chord root (role.lo), or with chance role.walk a random chord
+  // tone, one octave higher a quarter of the time. Repeats share the pitch and fade slightly.
+  chop({ song, role, pat, s, chord, stepDur }) {
+    const n = +pat[s % pat.length];
+    if (!n) return [];
+    const tones = chordMidi(song.key, chord, role.lo ?? 60);
+    const walk = Math.random() < (role.walk ?? 0.35);
+    const m = walk ? tones[Math.floor(Math.random() * tones.length)] + (Math.random() < 0.25 ? 12 : 0) : tones[0];
+    return Array.from({ length: n }, (_, i) => ({ freq: mtof(m), dur: stepDur / n * 0.7, vel: 0.9 - i * 0.12, dt: i * stepDur / n }));
   },
 };

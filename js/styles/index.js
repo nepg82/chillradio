@@ -5,5 +5,6 @@ import synthwave from './synthwave.js';
 import darksynth from './darksynth.js';
 import lofi from './lofi.js';
 import electro from './electro.js';
+import complextro from './complextro.js';
 
-export const STYLES = [chillwave, synthwave, darksynth, lofi, electro];
+export const STYLES = [chillwave, synthwave, darksynth, lofi, electro, complextro];

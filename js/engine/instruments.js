@@ -136,7 +136,11 @@ function synth(ctx, out, t, ev, p) {
   for (const spec of p.osc) {
     const o = ctx.createOscillator(), g = ctx.createGain(), pk = peak * (spec.gain ?? 1);
     o.type = spec.type;
-    o.frequency.value = ev.freq * (spec.mult || 1);
+    const f0 = ev.freq * (spec.mult || 1);
+    if (p.glide) { // optional per-note pitch glide: starts p.glide.from × the note, lands on it after p.glide.time s
+      o.frequency.setValueAtTime(f0 * p.glide.from, t);
+      o.frequency.exponentialRampToValueAtTime(f0, t + p.glide.time);
+    } else o.frequency.value = f0;
     if (p.vibrato) o.detune.setValueCurveAtTime(vibratoCurve(spec.detune || 0, p.vibrato, stopAt - t, t), t, stopAt - t);
     else o.detune.value = spec.detune || 0;
     g.gain.setValueAtTime(0.0001, t);
@@ -148,9 +152,42 @@ function synth(ctx, out, t, ev, p) {
   }
 }
 
+// ---- Wobble bass (Step 6) ---------------------------------------------------
+// Notes are oscillators into the role's shared drive → lowpass (BUS.wobble is BUS.synth). The part emits one
+// control event per bar ({ctl:true, rate, dur}); it schedules ONE cutoff curve on that shared filter, cancelling
+// first so curves never overlap. No per-note filters or LFOs. p.wob = { lo, hi, q }: cutoff range (Hz) and Q.
+// ev.rate = wobble cycles per beat (0 = hold the filter half-open). The curve starts fully open each bar.
+function wobble(ctx, out, t, ev, p) {
+  const tone = out.tone || out, w = p.wob;
+  if (ev.ctl) {
+    const f = tone.frequency;
+    tone.Q.setValueAtTime(w.q, t);
+    f.cancelScheduledValues(t);
+    if (!ev.rate) { f.setValueAtTime(w.hi * 0.6, t); return; }
+    const cycles = ev.rate * 4, n = Math.round(cycles * 24) + 1, c = new Float32Array(n);
+    for (let i = 0; i < n; i++) c[i] = w.lo * (w.hi / w.lo) ** (0.5 + 0.5 * Math.cos(2 * Math.PI * cycles * i / (n - 1)));
+    f.setValueCurveAtTime(c, t, ev.dur * 0.998);
+    return;
+  }
+  const { a = 0.005, d = 0.1, s = 0.9, r = 0.04 } = p.amp || {};
+  const dur = Math.max(ev.dur, a + 0.02), end = t + dur, stopAt = end + r * 2, peak = ev.vel * (p.gain ?? 0.2);
+  for (const spec of p.osc) {
+    const o = ctx.createOscillator(), g = ctx.createGain(), pk = peak * (spec.gain ?? 1);
+    o.type = spec.type;
+    o.frequency.value = ev.freq * (spec.mult || 1);
+    o.detune.value = spec.detune || 0;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(pk, t + a);
+    g.gain.setTargetAtTime(pk * s, t + a, d / 3);
+    g.gain.setTargetAtTime(0, end, r / 3);
+    o.connect(g).connect(out);
+    o.start(t); o.stop(stopAt);
+  }
+}
+
 // Registry: styles reference these by name via role.kind. To add a new kind
 // (e.g. a wobble bass), add a function here.
-export const KINDS = { kick, snare, hat, synth };
+export const KINDS = { kick, snare, hat, synth, wobble };
 
 // Buses: a kind that needs processing shared by all its notes declares it here. setStyle() calls
 // BUS[kind](ctx, out, keep) once per role and passes the returned node to the kind as its `out`.
@@ -173,3 +210,5 @@ export const BUS = {
     return sh;
   },
 };
+
+BUS.wobble = BUS.synth; // the wobble bass uses the same shared drive → filter bus

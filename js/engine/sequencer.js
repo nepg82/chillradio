@@ -41,7 +41,8 @@ export class Sequencer {
   close() { this.stop(); this.closeTicker?.(); this.closeTicker = null; }
 
   // arranger(phraseIndex) → { chord, active:Set<roleId>, section, pat?:{roleId: patternString} } | null (song over)
-  // `pat` (optional) overrides a role's pattern for that phrase (used by sectioned styles such as Electro).
+  // `pat` (optional) overrides a role's pattern for that phrase; `mod` (optional) = { roleId: { v, o, m } } per-step
+  // voice / octave / mask arrays (used by Electro and Complextro).
   // startAt (audio-clock seconds) lets a new song begin exactly when the gap ends.
   start(song, arranger, startAt) {
     this.open();
@@ -123,7 +124,19 @@ export class Sequencer {
     const chord = song.progression.chords[ci];
     for (const role of song.style.roles) {
       if (!phrase.active.has(role.id)) continue;
-      const events = PARTS[role.part]({ song, role, pat: phrase.pat?.[role.id] ?? song.patterns[role.id], s, chord, ci, stepDur });
+      let events = PARTS[role.part]({ song, role, pat: phrase.pat?.[role.id] ?? song.patterns[role.id], s, chord, ci, stepDur });
+      // Per-phrase modulation data from the arranger (see complextro.js): v = voice index per step (null = the
+      // role's chosen voice), o = octave shift in semitones per step, m = on/off mask per step. The part still
+      // runs on masked steps, so its internal state keeps moving; control events (ev.ctl) are never masked.
+      const mod = phrase.mod?.[role.id];
+      if (mod) {
+        if (mod.m && !mod.m[s]) events = events.filter(e => e.ctl);
+        for (const ev of events) {
+          if (ev.ctl) continue;
+          if (mod.v?.[s] != null) ev.v = mod.v[s];
+          if (mod.o?.[s]) ev.freq *= 2 ** (mod.o[s] / 12);
+        }
+      }
       for (const ev of events) this.engine.play(role, t + (ev.dt || 0), ev, song.voices[role.id]);
     }
   }

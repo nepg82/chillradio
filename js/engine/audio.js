@@ -158,6 +158,8 @@ export class AudioEngine {
 
   play(role, t, ev, voice) {
     this.notes++; this.songNotes++;
-    KINDS[role.kind](this.ctx, this.outs[role.id], t, ev, voice.p);
+    // ev.v (from the arranger's per-phrase `mod` data) picks one of the role's voices for this single note
+    const vp = ev.v != null ? role.voices[ev.v % role.voices.length] : voice;
+    KINDS[role.kind](this.ctx, this.outs[role.id], t, ev, vp.p);
   }
 }
