@@ -17,6 +17,7 @@ const state = {
   mode: saved.mode || 'manual',
   styleId: saved.styleId || STYLES[0].id,
   allStyles: !!saved.allStyles,
+  radioOff: Array.isArray(saved.radioOff) ? saved.radioOff : [], // style ids left out of Radio's hop (a blacklist, so new styles join by default)
   reverb: saved.reverb !== false,
   levels: saved.levels || {},          // { styleId: { roleId: dB } }
   userSwing: saved.userSwing ?? null,   // fraction of a 16th; null = style default
@@ -25,8 +26,8 @@ const state = {
   song: null, playing: false, paused: false, yielded: false,
 };
 const save = () => {
-  const { mode, styleId, allStyles, levels, userBpm, userSwing, reverb } = state;
-  try { localStorage.setItem('chillradio', JSON.stringify({ mode, styleId, allStyles, levels, userBpm, userSwing, reverb })); } catch {}
+  const { mode, styleId, allStyles, radioOff, levels, userBpm, userSwing, reverb } = state;
+  try { localStorage.setItem('chillradio', JSON.stringify({ mode, styleId, allStyles, radioOff, levels, userBpm, userSwing, reverb })); } catch {}
 };
 
 const style = () => STYLES.find(s => s.id === state.styleId) || STYLES[0];
@@ -133,6 +134,7 @@ async function play() {
   resetClock();
   engine.setStyle(style(), levelsFor(style()));
   state.playing = true; state.paused = false;
+  lastHop = null; // a new Radio session may start on any style in the rotation
   state.mode === 'radio' ? nextRadio() : startManual();
   renderTransport();
 }
@@ -219,14 +221,25 @@ function startManual() {
   seq.start(song, i => ({ chord: i, active: all, section: 'Jam' }));
 }
 
+// Radio's style hop: pick from the ticked styles (state.radioOff lists the unticked ones), never the same style twice
+// in a row unless it is the only one left. Nothing ticked = every style. Takes effect at the next song.
+let lastHop = null;
+function pickHop() {
+  let pool = STYLES.filter(s => !state.radioOff.includes(s.id));
+  if (!pool.length) pool = STYLES;
+  const fresh = pool.filter(s => s.id !== lastHop);
+  const from = fresh.length ? fresh : pool;
+  return (lastHop = from[Math.floor(Math.random() * from.length)].id);
+}
+
 function nextRadio(startAt) {
   if (!state.playing) return;
   const t0 = performance.now();
   // Radio always uses each style's own tempo range and swing: a BPM/swing tweak lasts only for the song it was made in.
   state.userBpm = null; state.userSwing = null; seq.swing = null; save();
   if (state.allStyles) {
-    const pick = STYLES[Math.floor(Math.random() * STYLES.length)];
-    if (pick.id !== state.styleId) selectStyle(pick.id);
+    const pick = pickHop();
+    if (pick !== state.styleId) selectStyle(pick);
   }
   const { song, arranger } = planRadio(style(), null);
   adopt(song);
@@ -294,8 +307,19 @@ function setMode(mode) {
 function renderMode() {
   document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === state.mode));
   $('#all-styles-row').hidden = state.mode !== 'radio';
+  renderPool();
   $('#next').hidden = state.mode !== 'radio';
   session.setRadio(state.mode === 'radio');
+}
+
+// The checklist of styles in Radio's rotation (shown in Radio mode while hopping is on).
+function renderPool() {
+  $('#radio-pool').hidden = state.mode !== 'radio' || !state.allStyles;
+  const on = STYLES.filter(s => !state.radioOff.includes(s.id)).length;
+  $('#pool-title').textContent = `Styles in rotation (${on} of ${STYLES.length})`;
+  $('#pool-list').innerHTML = STYLES.map(s => `
+    <label class="check"><input type="checkbox" data-id="${s.id}"${state.radioOff.includes(s.id) ? '' : ' checked'}> ${s.name}</label>`).join('');
+  $('#pool-hint').hidden = on > 0;
 }
 
 function renderTransport() {
@@ -358,7 +382,15 @@ $('#bpm-up').onclick = () => setBpm(state.bpm + 1);
 seq.swing = state.userSwing;
 $('#swing').oninput = e => { state.userSwing = e.target.value / 100; seq.swing = state.userSwing; save(); renderSwing(); };
 $('#swing-reset').onclick = () => { state.userSwing = null; seq.swing = null; save(); renderSwing(); };
-$('#all-styles').onchange = e => { state.allStyles = e.target.checked; save(); };
+$('#all-styles').onchange = e => { state.allStyles = e.target.checked; save(); renderPool(); };
+$('#pool-list').addEventListener('change', e => {
+  const id = e.target.dataset.id;
+  if (!id) return;
+  state.radioOff = e.target.checked ? state.radioOff.filter(x => x !== id) : [...new Set([...state.radioOff, id])];
+  save(); renderPool();
+});
+$('#pool-all').onclick = () => { state.radioOff = []; save(); renderPool(); };
+$('#pool-none').onclick = () => { state.radioOff = STYLES.map(s => s.id); save(); renderPool(); };
 $('#reverb').onchange = e => { state.reverb = e.target.checked; engine.reverbOn = state.reverb; save(); restart(); };
 document.querySelectorAll('[data-mode]').forEach(b => (b.onclick = () => setMode(b.dataset.mode)));
 

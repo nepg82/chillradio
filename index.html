@@ -21,7 +21,7 @@
       <div class="titlebar">
         <h1 id="title">Ready</h1>
         <!-- build stamp: tap to show the event log -->
-        <span class="build" id="ver">261123-1317</span>
+        <span class="build" id="ver">261123-1745</span>
       </div>
       <p id="meta"></p>
       <p id="section">Stopped</p>
@@ -35,7 +35,16 @@
     </div>
 
     <label class="field">Style <select id="style"></select></label>
-    <label class="check" id="all-styles-row" hidden><input type="checkbox" id="all-styles"> Radio hops between all styles</label>
+    <label class="check" id="all-styles-row" hidden><input type="checkbox" id="all-styles"> Radio hops between styles</label>
+    <fieldset class="pool" id="radio-pool" hidden>
+      <legend id="pool-title">Styles in rotation</legend>
+      <div class="pool-actions">
+        <button type="button" id="pool-all">Select all</button>
+        <button type="button" id="pool-none">Select none</button>
+      </div>
+      <div id="pool-list"></div>
+      <p id="pool-hint" hidden>Nothing ticked: Radio will hop between all styles.</p>
+    </fieldset>
 
     <label class="check"><input type="checkbox" id="reverb"> Reverb</label>
 
