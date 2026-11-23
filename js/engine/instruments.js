@@ -163,10 +163,32 @@ function wobble(ctx, out, t, ev, p) {
     const f = tone.frequency;
     tone.Q.setValueAtTime(w.q, t);
     f.cancelScheduledValues(t);
-    if (!ev.rate) { f.setValueAtTime(w.hi * 0.6, t); return; }
-    const cycles = ev.rate * 4, n = Math.round(cycles * 24) + 1, c = new Float32Array(n);
-    for (let i = 0; i < n; i++) c[i] = w.lo * (w.hi / w.lo) ** (0.5 + 0.5 * Math.cos(2 * Math.PI * cycles * i / (n - 1)));
-    f.setValueCurveAtTime(c, t, ev.dur * 0.998);
+    if (ev.pts) { // "talking" bass (Step 7): one smooth cutoff curve through the bar's vowel points (each 0–1 on the lo→hi log scale)
+      const seg = 20, k = ev.pts.length, n = (k - 1) * seg + 1, c = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const g = Math.min(k - 2, Math.floor(i / seg)), u = (i - g * seg) / seg, e = 0.5 - 0.5 * Math.cos(Math.PI * u);
+        c[i] = w.lo * (w.hi / w.lo) ** (ev.pts[g] + (ev.pts[g + 1] - ev.pts[g]) * e);
+      }
+      f.setValueCurveAtTime(c, t, ev.dur * 0.998);
+    } else if (!ev.rate) f.setValueAtTime(w.hi * 0.6, t);
+    else {
+      const cycles = ev.rate * 4, n = Math.round(cycles * 24) + 1, c = new Float32Array(n);
+      for (let i = 0; i < n; i++) c[i] = w.lo * (w.hi / w.lo) ** (0.5 + 0.5 * Math.cos(2 * Math.PI * cycles * i / (n - 1)));
+      f.setValueCurveAtTime(c, t, ev.dur * 0.998);
+    }
+    // Pump (Step 7): p.pump = { depth, release } ducks the role's persistent pump gain on every beat, like a
+    // sidechain from a four-on-the-floor kick. One curve per bar on ONE persistent gain, cancelled first so
+    // curves never overlap. depth = how far it ducks (0–1), release = fraction of a beat to recover.
+    const pg = tone.pump;
+    if (pg && p.pump) {
+      const per = 16, n = per * 4 + 1, c = new Float32Array(n), { depth = 0.85, release = 0.6 } = p.pump;
+      for (let i = 0; i < n; i++) {
+        const fr = (i / per) % 1, u = Math.min(1, fr / release);
+        c[i] = i === n - 1 ? 1 : 1 - depth * (1 - u) * (1 - u);
+      }
+      pg.gain.cancelScheduledValues(t);
+      pg.gain.setValueCurveAtTime(c, t, ev.dur * 0.998);
+    }
     return;
   }
   const { a = 0.005, d = 0.1, s = 0.9, r = 0.04 } = p.amp || {};
@@ -211,4 +233,13 @@ export const BUS = {
   },
 };
 
-BUS.wobble = BUS.synth; // the wobble bass uses the same shared drive → filter bus
+// The wobble bus is the synth bus (drive → filter), plus, when role.pump is set, one persistent pump gain after
+// the filter (Step 7). The filter keeps the pump node as `.pump`; the wobble kind automates it once per bar.
+BUS.wobble = (ctx, out, keep, role = {}) => {
+  if (!role.pump) return BUS.synth(ctx, out, keep, role);
+  const pg = keep(ctx.createGain());
+  pg.gain.value = 1; pg.connect(out);
+  const bus = BUS.synth(ctx, pg, keep, role);
+  (bus.tone || bus).pump = pg;
+  return bus;
+};

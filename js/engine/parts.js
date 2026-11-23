@@ -101,8 +101,13 @@ export const PARTS = {
   wobble(c) {
     const evs = PARTS.bass(c);
     if (c.s % 16) return evs;
-    const rates = c.role.rates ?? [1, 2, 2, 3, 4];
-    evs.unshift({ ctl: true, rate: rates[Math.floor(Math.random() * rates.length)], dur: 16 * c.stepDur });
+    const rates = c.role.rates ?? [1, 2, 2, 3, 4], tk = c.role.talk; // role.talk = { chance, points }: this bar "talks" instead of wobbling
+    const ctl = { ctl: true, rate: rates[Math.floor(Math.random() * rates.length)], dur: 16 * c.stepDur };
+    if (tk && Math.random() < tk.chance) { // random walk of vowel-like cutoff targets, one per eighth note, favouring the extremes
+      const VOWELS = [0.08, 0.2, 0.45, 0.7, 0.9, 1];
+      ctl.pts = Array.from({ length: tk.points ?? 8 }, () => VOWELS[Math.floor(Math.random() * VOWELS.length)]);
+    }
+    evs.unshift(ctl);
     return evs;
   },
 
