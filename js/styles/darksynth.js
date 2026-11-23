@@ -43,7 +43,7 @@ export default {
       patterns: ['....x.......x...'],
       voices: [
       	{ name: 'Gated Snare', p: { gate: 0.19, noiseFreq: 2200, q: 0.7, gain: 0.35, tone: 175, toneDecay: 0.11, toneGain: 0.19 } },
-      	{ name: 'Big Snare', p: { noiseFreq: 2200, q: 0.7, decay: 0.17, gain: 0.5, tone: 190, toneDecay: 0.09, toneGain: 0.25 } },
+      	{ name: 'Less Gated Snare', p: { gate: 0.01, noiseFreq: 2200, q: 0.7, gain: 0.35, tone: 175, toneDecay: 0.11, toneGain: 0.19 } },
       ],
     },
     {
