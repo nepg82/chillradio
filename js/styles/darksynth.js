@@ -42,8 +42,7 @@ export default {
       id: 'snare', label: 'Snare', part: 'drum', kind: 'snare', mix: 0, send: { rev: 0.4 },
       patterns: ['....x.......x...'],
       voices: [
-      	{ name: 'Gated Snare', p: { gate: 0.19, noiseFreq: 2200, q: 0.7, gain: 0.35, tone: 175, toneDecay: 0.11, toneGain: 0.19 } },
-      	{ name: 'Less Gated Snare', p: { gate: 0.01, noiseFreq: 2200, q: 0.7, gain: 0.35, tone: 175, toneDecay: 0.11, toneGain: 0.19 } },
+      	{ name: 'Gated Snare', p:   { gate: 0.19, noiseFreq: 1100, q: 0.7, decay: 0.00, gain: 0.35, tone: 175, toneDecay: 0.11, toneGain: 0.19 } },
       ],
     },
     {
