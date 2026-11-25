@@ -3,7 +3,7 @@
 // - install: fetches every file with cache:'reload' so the browser's HTTP cache (GitHub Pages allows
 //   10 min) can never hand it a stale file to store.
 // - fetch: network first (revalidated, 4 s timeout), falling back to the stored copy when offline.
-const CACHE = 'chill-radio-v0.6.3';
+const CACHE = 'chill-radio-v0.6.4';
 const ASSETS = [
   './', './index.html', './manifest.json', './css/style.css',
   './js/app.js', './js/mediasession.js',
@@ -31,7 +31,7 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const r = e.request;
-  if (r.method !== 'GET' || location.hostname === 'localhost' || new URL(r.url).origin !== location.origin) return;
+  if (r.method !== 'GET' || location.hostname === 'localhost' || new URL(r.url).origin !== location.origin || new URL(r.url).pathname.includes('/deck/')) return; // /deck/ is a laptop tool: never cached by the PWA
   e.respondWith(
     Promise.race([
       fetch(r, { cache: 'no-cache' }),
